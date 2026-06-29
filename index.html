@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game Library</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --ink:#101218; --panel:#1b1e29; --raised:#252a3a; --line:#343a4e;
+    --text:#f3f4f9; --muted:#b4bccd; --faint:#828aa3;
+    --amber:#f3ad3e; --mint:#5fe0cb; --violet:#a99cff;
+    --q1:#a99cff; --q2:#3ee07f; --q3:#8fbfa3;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:
+      radial-gradient(1100px 600px at 78% -10%, rgba(139,127,240,.10), transparent 60%),
+      radial-gradient(900px 500px at -5% 8%, rgba(95,211,192,.07), transparent 55%),
+      var(--ink);
+    color:var(--text); font-family:"Hanken Grotesk",system-ui,-apple-system,sans-serif;
+    line-height:1.45; -webkit-font-smoothing:antialiased; min-height:100vh;
+  }
+  .wrap{max-width:1180px; margin:0 auto; padding:24px 18px 90px}
+  .hide{display:none !important}
+  button{font-family:inherit}
+
+  .top{display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:20px}
+  .eyebrow{font-family:"IBM Plex Mono",monospace; font-size:11px; letter-spacing:.32em; text-transform:uppercase; color:var(--mint); margin:0 0 6px}
+  h1{font-family:"Bricolage Grotesque",sans-serif; font-weight:800; font-size:clamp(28px,5.5vw,44px); line-height:.98; letter-spacing:-.02em; margin:0}
+  .actions{display:flex; gap:9px; flex-wrap:wrap; align-items:center}
+  .btn{display:inline-flex; align-items:center; gap:8px; cursor:pointer; background:linear-gradient(180deg,#2b3149,#222637);
+    color:var(--text); border:1px solid var(--line); border-radius:11px; padding:10px 14px; font-weight:600; font-size:13.5px; transition:border-color .18s, transform .18s}
+  .btn:hover{border-color:var(--mint); transform:translateY(-1px)}
+  .btn svg{width:16px;height:16px;stroke:var(--mint);fill:none;stroke-width:1.8}
+  .btn.primary{background:linear-gradient(180deg,#f0ad45,#d98a25); color:#1a1205; border-color:#caa05a}
+  .btn.primary svg{stroke:#1a1205}
+  .btn.ghost{background:transparent}
+  input[type=file]{position:absolute;width:1px;height:1px;opacity:0}
+  .diag{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--muted); margin-top:7px}
+  .diag b{color:var(--text);font-weight:500}
+  .unsaved{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--amber);background:rgba(232,161,58,.1);border:1px solid rgba(232,161,58,.35);border-radius:8px;padding:5px 10px}
+
+  .empty{border:1px dashed var(--line); border-radius:18px; padding:54px 28px; text-align:center;
+    background:linear-gradient(180deg,rgba(35,39,54,.5),rgba(28,31,43,.3)); margin-top:16px}
+  .empty .ring{width:60px;height:60px;border-radius:50%;margin:0 auto 14px;display:grid;place-items:center;
+    background:radial-gradient(circle at 50% 40%,rgba(95,211,192,.2),transparent 70%);border:1px solid var(--line)}
+  .empty .ring svg{width:26px;height:26px;stroke:var(--mint);fill:none;stroke-width:1.6}
+  .empty .big{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:23px;margin:0 0 6px}
+  .empty p{color:var(--muted);max-width:470px;margin:0 auto 22px;font-size:15px}
+
+  .hero{margin-top:4px; border:1px solid var(--line); border-radius:18px; overflow:hidden; background:linear-gradient(180deg,var(--raised),var(--panel))}
+  .hero-top{display:grid; grid-template-columns:repeat(2,1fr)}
+  .stat{padding:16px 18px; border-right:1px solid var(--line)}
+  .stat:last-child{border-right:none}
+  .stat .k{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+  .stat .v{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:clamp(20px,3.2vw,30px);letter-spacing:-.02em;line-height:1}
+  .stat .v small{font-size:13px;color:var(--muted);font-weight:600;font-family:"Hanken Grotesk",sans-serif;margin-left:2px}
+  .stat.amber .v{color:var(--amber)} .stat.mint .v{color:var(--mint)} .stat.violet .v{color:var(--violet)}
+  .hero-slim{display:flex;align-items:baseline;gap:11px;margin:6px 0 14px;padding:0 2px}
+  .hero-slim .hs-num{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:clamp(30px,6vw,42px);letter-spacing:-.02em;line-height:1;color:var(--mint)}
+  .hero-slim .hs-lbl{font-size:15px;color:var(--muted)}
+  .spine{margin:2px 0 13px}
+  .spine .lbl{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--muted);margin-bottom:9px}
+  .spine .lbl .save{color:var(--mint);font-weight:600}
+  .bar{height:15px;border-radius:8px;border:1px solid var(--line);overflow:hidden;
+    background:repeating-linear-gradient(45deg,rgba(95,211,192,.12),rgba(95,211,192,.12) 7px,rgba(95,211,192,.05) 7px,rgba(95,211,192,.05) 14px)}
+  .bar .fill{height:100%;background:linear-gradient(90deg,#d98a25,var(--amber));box-shadow:0 0 18px rgba(232,161,58,.35);transition:width .9s cubic-bezier(.2,.7,.2,1)}
+  .bar-foot{display:flex;justify-content:space-between;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--faint);margin-top:6px}
+
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:14px}
+  @media (max-width:1024px){.grid4{grid-template-columns:repeat(2,1fr)}}
+  @media (max-width:560px){.grid4{grid-template-columns:1fr}}
+  .card{border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:15px 16px 17px}
+  .card h3{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:15px;margin:0 0 1px}
+  .card .sub{font-size:12px;color:var(--muted);margin:0 0 13px}
+  .clrow{display:grid;grid-template-columns:66px 1fr auto;align-items:center;gap:10px;margin:7px 0;font-size:13px;cursor:pointer;border-radius:7px;padding:3px 5px;transition:background .12s}
+  .clrow:hover{background:rgba(95,211,192,.07)}
+  .clrow.on{background:rgba(95,211,192,.16)}
+  .clrow .nm{color:var(--muted);font-family:"IBM Plex Mono",monospace;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .clrow .track{height:9px;border-radius:5px;background:var(--raised);overflow:hidden}
+  .clrow .track i{display:block;height:100%;border-radius:5px}
+  .clrow .num{font-family:"IBM Plex Mono",monospace;font-size:12px;text-align:right;min-width:50px}
+  .t-amber i{background:linear-gradient(90deg,#b6781f,var(--amber))}
+  .t-mint i{background:linear-gradient(90deg,#2f8d7f,var(--mint))}
+  .t-violet i{background:linear-gradient(90deg,#5f53b8,var(--violet))}
+  .t-green i{background:linear-gradient(90deg,#1f9b63,#3ee07f)}
+  .t-sage i{background:linear-gradient(90deg,#5f7d6c,var(--q3))}
+  .t-faint i{background:linear-gradient(90deg,#3a3f52,#737b92)}
+
+  .lib{margin-top:22px}
+  .lib-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:11px}
+  .lib-head h2{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:20px;margin:0}
+  .lib-head h2 span{color:var(--muted);font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:500;margin-left:8px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap}
+  .controls input,.controls select{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:9px 11px;font-family:"Hanken Grotesk",sans-serif;font-size:13.5px;outline:none}
+  .controls input{min-width:180px}
+  .controls input::placeholder{color:var(--faint)}
+  .controls input:focus,.controls select:focus{border-color:var(--mint)}
+  .chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:12px;background:rgba(95,211,192,.1);border:1px solid rgba(95,211,192,.35);color:var(--mint);border-radius:999px;padding:4px 6px 4px 11px}
+  .chip b{color:var(--text);font-weight:500}
+  .chip button{background:none;border:none;color:var(--mint);cursor:pointer;font-size:14px;line-height:1;padding:0 4px;border-radius:50%}
+  .chip button:hover{background:rgba(95,211,192,.25)}
+  .chip.clear{background:none;border-color:var(--line);color:var(--muted);cursor:pointer;padding:4px 11px}
+
+  .tablewrap{border:1px solid var(--line);border-radius:14px;overflow:auto;background:var(--panel);max-height:72vh}
+  table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
+  thead th{position:sticky;top:0;z-index:3;background:#1a1d28;color:var(--muted);text-align:left;
+    font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:11px;letter-spacing:.04em;text-transform:uppercase;
+    padding:11px 12px;border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none}
+  thead th.r{text-align:right} thead th .ar{color:var(--mint);margin-left:3px}
+  tbody td{padding:9px 12px;border-bottom:1px solid rgba(44,49,66,.55);white-space:nowrap}
+  tbody tr{cursor:pointer}
+  tbody tr:hover td{background:rgba(95,211,192,.05)}
+  td.name{white-space:normal;min-width:200px;font-weight:600}
+  td.name .edit{opacity:0;color:var(--mint);font-size:11px;margin-left:7px;font-family:"IBM Plex Mono",monospace}
+  tbody tr:hover td.name .edit{opacity:1}
+  td.num{font-family:"IBM Plex Mono",monospace;text-align:right}
+  .series{color:var(--muted)}
+  .pill{font-family:"IBM Plex Mono",monospace;font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--mint);box-shadow:0 0 7px rgba(95,211,192,.6)}
+  .sticky-name{position:sticky;left:0;background:var(--panel);z-index:2}
+  thead th.sticky-name{z-index:4;background:#1a1d28}
+  tbody tr:hover td.sticky-name{background:#202430}
+  .more{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:7px;padding:12px;color:var(--muted);font-size:12.5px;font-family:"IBM Plex Mono",monospace}
+  .pg{background:var(--raised);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:6px 11px;cursor:pointer;font-family:inherit;font-size:12.5px}
+  .pg:hover:not(:disabled){border-color:var(--mint)}
+  .pg:disabled{opacity:.35;cursor:default}
+  .pgmid{min-width:150px;text-align:center;color:var(--muted)}
+
+  .tabs{display:flex;gap:4px;margin-bottom:18px;border:1px solid var(--line);border-radius:12px;padding:4px;background:var(--panel);width:fit-content;max-width:100%;overflow:auto}
+  .tabs button{background:none;border:none;color:var(--muted);font-family:"Hanken Grotesk",sans-serif;font-weight:600;font-size:13.5px;padding:8px 16px;border-radius:9px;cursor:pointer;white-space:nowrap;transition:background .15s,color .15s}
+  .tabs button.on{background:var(--raised);color:var(--text)}
+  .tabs button .ct{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--faint);margin-left:6px}
+  .panel{animation:fade .25s ease}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  /* owned indicated by color, not a column */
+  tbody tr.unowned td{color:var(--muted)}
+  tbody tr.unowned td.name{color:var(--muted);font-weight:500}
+  tbody tr.unowned{background:rgba(255,255,255,.05)}
+  tbody tr.unowned td.sticky-name{background:#262a35}
+  tbody tr.unowned:hover td{background:rgba(255,255,255,.085)}
+  tbody tr.unowned:hover td.sticky-name{background:#2d313e}
+  /* quality ribbon: 3 brightness levels of green by tier (top/good/ok) */
+  tbody tr.t-top  td.sticky-name{box-shadow:inset 4px 0 0 var(--q1)}
+  tbody tr.t-good td.sticky-name{box-shadow:inset 4px 0 0 var(--q2)}
+  tbody tr.t-ok   td.sticky-name{box-shadow:inset 4px 0 0 var(--q3)}
+  .avail{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:1px 5px;margin-left:7px;vertical-align:middle}
+  .legend{display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);margin:2px 0 9px}
+  .legend i{display:inline-block;width:16px;height:11px;border-radius:3px;vertical-align:middle;margin-right:5px;background:#262a35}
+  .rib{display:inline-block;width:5px;height:12px;border-radius:2px;vertical-align:middle;margin-right:2px}
+  .rib3{background:var(--q1)} .rib2{background:var(--q2)} .rib1{background:var(--q3)}
+  .av-top{color:var(--q1);font-weight:700} .av-good{color:var(--q2);font-weight:700} .av-ok{color:var(--q3);font-weight:600} .av-low{color:var(--text)}
+  .wbk{accent-color:var(--mint);width:15px;height:15px;margin-right:8px;vertical-align:middle;cursor:pointer}
+  tbody tr.bought td{color:var(--faint)}
+  tbody tr.bought .wgame{text-decoration:line-through;text-decoration-color:var(--mint)}
+  tbody tr.bought td.sticky-name{background:rgba(95,224,203,.06)}
+  /* per-series chart */
+  #serieschart{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:14px 16px 10px;margin-bottom:12px}
+  #serieschart .ttl{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:15px;margin:0 0 2px}
+  #serieschart .leg{display:flex;gap:16px;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);margin:4px 0 8px}
+  #serieschart .leg span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+  #serieschart .leg .c1::before{background:var(--mint)} #serieschart .leg .c2::before{background:var(--violet)} #serieschart .leg .c3::before{background:var(--amber)}
+  #serieschart svg{width:100%;height:auto;display:block}
+
+  .scrim{position:fixed;inset:0;background:rgba(8,9,13,.66);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:18px;z-index:50}
+  .modal{width:min(540px,100%);max-height:92vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.5)}
+  .modal-h{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel)}
+  .modal-h h3{font-family:"Bricolage Grotesque",sans-serif;font-weight:700;font-size:19px;margin:0}
+  .modal-h .x{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1}
+  .form{padding:16px 20px 20px;display:grid;grid-template-columns:1fr 1fr;gap:13px}
+  .f{display:flex;flex-direction:column;gap:5px}
+  .f.full{grid-column:1 / -1}
+  .f label{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+  .f input,.f select{background:var(--raised);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:9px 11px;font-family:"Hanken Grotesk",sans-serif;font-size:14px;outline:none}
+  .f input:focus,.f select:focus{border-color:var(--mint)}
+  .f .ro{color:var(--faint);font-family:"IBM Plex Mono",monospace;font-size:13px;padding:9px 11px;border:1px dashed var(--line);border-radius:9px}
+  .checkrow{display:flex;align-items:center;gap:9px}
+  .checkrow input{width:18px;height:18px;accent-color:var(--mint)}
+  .modal-f{display:flex;justify-content:space-between;gap:10px;padding:16px 20px;border-top:1px solid var(--line);position:sticky;bottom:0;background:var(--panel)}
+  .btn.danger{background:transparent;border-color:rgba(232,93,93,.4);color:#e57a7a}
+  .btn.danger:hover{border-color:#e57a7a}
+
+  .menu{position:relative}
+  .menu-pop{position:absolute;right:0;top:calc(100% + 6px);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:6px;z-index:30;min-width:200px;box-shadow:0 16px 40px rgba(0,0,0,.4)}
+  .menu-pop button{display:flex;width:100%;gap:9px;align-items:center;justify-content:space-between;background:none;border:none;color:var(--text);text-align:left;padding:9px 10px;border-radius:8px;font-size:13.5px;cursor:pointer}
+  .menu-pop button:hover{background:var(--raised)}
+  .menu-pop small{color:var(--faint);font-family:"IBM Plex Mono",monospace}
+
+  .foot{margin-top:24px;color:var(--faint);font-size:12px;line-height:1.7}
+  .foot b{color:var(--muted);font-weight:500}
+
+  @media (max-width:880px){
+    .form{grid-template-columns:1fr}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+  :focus-visible{outline:2px solid var(--mint);outline-offset:2px;border-radius:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <p class="eyebrow">personal archive</p>
+      <h1>Game Library</h1>
+      <div class="diag" id="diag"></div>
+    </div>
+    <div class="actions">
+      <span class="unsaved hide" id="unsaved"></span>
+      <button class="btn primary hide" id="addBtn"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add game</button>
+      <div class="menu">
+        <button class="btn hide" id="dlBtn"><svg viewBox="0 0 24 24"><path d="M12 4v12m0 0l-5-5m5 5l5-5M4 20h16"/></svg>Download</button>
+        <div class="menu-pop hide" id="dlMenu">
+          <button data-fmt="xlsx">Excel (.xlsx) <small>recommended</small></button>
+          <button data-fmt="ods">OpenDocument (.ods)</button>
+          <button data-fmt="csv">Games as CSV</button>
+        </div>
+      </div>
+      <label class="btn ghost"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7 9m5-5l5 5M4 20h16"/></svg><span id="loadLabel">Open file</span><input type="file" id="file" accept=".ods,.xlsx,.xls"></label>
+    </div>
+  </div>
+
+  <section id="empty" class="empty">
+    <div class="ring"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg></div>
+    <div class="big">Load your library to begin</div>
+    <p>Open your <b>games_v7.ods</b> — from Drive or your phone. It’s read in your browser; nothing is uploaded. Edit freely, then download an updated file to keep.</p>
+    <label class="btn primary" style="display:inline-flex"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7 9m5-5l5 5M4 20h16"/></svg>Choose file<input type="file" accept=".ods,.xlsx,.xls" onchange="document.getElementById('file').files=this.files;document.getElementById('file').dispatchEvent(new Event('change'))"></label>
+  </section>
+
+  <main id="app" class="hide">
+    <nav class="tabs" id="tabs">
+      <button data-tab="library" class="on">Library <span class="ct" id="ct-lib"></span></button>
+      <button data-tab="wishlist">Wishlist <span class="ct" id="ct-wish"></span></button>
+      <button data-tab="ratings">My ratings <span class="ct" id="ct-rate"></span></button>
+    </nav>
+
+    <div id="tab-library" class="panel">
+    <div class="hero-slim">
+      <span class="hs-num" id="s-owned">—</span>
+      <span class="hs-lbl">games owned</span>
+    </div>
+
+    <div class="grid4">
+      <div class="card"><h3>Spending by year</h3>
+        <div class="spine">
+          <div class="lbl"><span>Spent vs. full retail</span><span class="save">saved <b id="spine-pct">—</b></span></div>
+          <div class="bar"><div class="fill" id="spine-fill" style="width:0%"></div></div>
+          <div class="bar-foot"><span id="spine-paid">paid —</span><span id="spine-retail">retail —</span></div>
+        </div>
+        <p class="sub">Tap a year to see those buys, priciest first</p><div id="byyear"></div></div>
+      <div class="card"><h3>By store</h3><p class="sub">Tap to filter · priciest first</p><div id="bystore"></div></div>
+      <div class="card"><h3>Top series</h3><p class="sub">Tap to filter the library</p><div id="byseries"></div></div>
+      <div class="card"><h3>Quality tiers</h3><p class="sub">Tap to filter · best first</p><div id="tiers"></div></div>
+    </div>
+
+    <section class="lib">
+      <div class="lib-head">
+        <h2>Library <span id="lib-count"></span></h2>
+        <div class="controls">
+          <input type="search" id="q" placeholder="Search name or series…">
+          <select id="store"></select>
+          <select id="series"></select>
+          <select id="own"><option value="">All games</option><option value="yes">Owned only</option><option value="no">Not owned — to review</option></select>
+        </div>
+      </div>
+      <div class="legend" id="ownlegend"><span><span class="rib rib3"></span><span class="rib rib2"></span><span class="rib rib1"></span> quality: 90+ / 85+ / 78+</span><span><i></i>gray row = not owned</span><span><span class="avail" style="margin:0">also on Steam</span> = owned on 2 stores, counted once</span></div>
+      <div class="chips" id="chips"></div>
+      <div id="serieschart" class="hide"></div>
+      <div class="tablewrap">
+        <table><thead><tr id="thead"></tr></thead><tbody id="tbody"></tbody></table>
+        <div class="more hide" id="more"></div>
+      </div>
+    </section>
+
+    <div class="foot" id="foot"></div>
+    </div><!-- /tab-library -->
+
+    <div id="tab-wishlist" class="panel hide">
+      <div class="lib-head"><h2>Wishlist <span id="wish-count"></span></h2>
+        <div class="controls"><input type="search" id="wq" placeholder="Search wishlist…"><button class="btn primary" id="wadd"><svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:#1a1205;fill:none;stroke-width:1.8"><path d="M12 5v14M5 12h14"/></svg>Add</button></div></div>
+      <div class="tablewrap"><table><thead><tr id="wthead"></tr></thead><tbody id="wbody"></tbody></table></div>
+      <div class="foot">From your <b>Wishlists</b> sheet — tap a row to edit, or tick the box once you've bought it. Saved into the file on download.</div>
+    </div>
+
+    <div id="tab-ratings" class="panel hide">
+      <div class="lib-head"><h2>My ratings <span id="rate-count"></span></h2>
+        <div class="controls"><input type="search" id="rq" placeholder="Search your ratings…"><button class="btn primary" id="radd"><svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:#1a1205;fill:none;stroke-width:1.8"><path d="M12 5v14M5 12h14"/></svg>Add</button></div></div>
+      <div class="tablewrap"><table><thead><tr id="rthead"></tr></thead><tbody id="rbody"></tbody></table></div>
+      <div class="foot">Your personal scores (out of 10), one row per game — <b>special editions are merged</b> into the base game. Editing a score updates every matching edition's <b>Mine</b> column live, and saves back on download.</div>
+    </div>
+  </main>
+</div>
+
+<div class="scrim hide" id="scrim"><div class="modal" id="modal"></div></div>
+
+<script>
+/* ============ constants ============ */
+// per-game franchise rules (matched against an apostrophe/underscore-normalized name)
+const SERIES_RULES=[
+ [/\bcall of duty\b|\bcod\b|\bmodern warfare\b|\bblack ops\b/i,'Call of Duty'],[/\bbattlefield\b/i,'Battlefield'],
+ [/\bassassin.?s creed\b/i,"Assassin's Creed"],[/\bfar cry\b/i,'Far Cry'],[/\bwatch ?dogs\b/i,'Watch Dogs'],
+ [/\bsplinter cell\b/i,'Splinter Cell'],[/\bghost recon\b/i,'Ghost Recon'],[/\brainbow six\b/i,'Rainbow Six'],
+ [/\bthe division\b/i,'The Division'],[/\bprince of persia\b/i,'Prince of Persia'],[/\bneed for speed\b|\bnfs\b/i,'Need for Speed'],
+ [/\bforza\b/i,'Forza'],[/\bfifa\b|\bea sports fc\b/i,'FIFA'],[/\bmass effect\b/i,'Mass Effect'],[/\bdragon age\b/i,'Dragon Age'],
+ [/\bdead space\b/i,'Dead Space'],[/\bcrysis\b/i,'Crysis'],[/\bthe sims\b|\bsims \d|\bsims:/i,'The Sims'],[/\bthe witcher\b/i,'The Witcher'],
+ [/\bcyberpunk\b/i,'Cyberpunk'],[/\bgrand theft auto\b|\bgta\b/i,'Grand Theft Auto'],[/\bred dead\b/i,'Red Dead'],[/\bmax payne\b/i,'Max Payne'],
+ [/\bhalo\b/i,'Halo'],[/\bgears (of war|5|4|tactics)\b/i,'Gears of War'],[/\btotal war\b/i,'Total War'],
+ [/galactic civ/i,'Galactic Civilizations'],[/\bcivilization\b|sid meier.?s civ/i,'Civilization'],[/\bfinal fantasy\b|\bff[ivx]+\b/i,'Final Fantasy'],[/\bdragon quest\b/i,'Dragon Quest'],
+ [/\bkingdom hearts\b/i,'Kingdom Hearts'],[/\bresident evil\b/i,'Resident Evil'],[/\bdevil may cry\b/i,'Devil May Cry'],
+ [/\bmonster hunter\b/i,'Monster Hunter'],[/\bdark souls\b/i,'Dark Souls'],[/\belden ring\b/i,'Elden Ring'],[/\bsekiro\b/i,'Sekiro'],
+ [/\bbloodborne\b/i,'Bloodborne'],[/\bthe elder scrolls\b|\bskyrim\b|\boblivion\b|\bmorrowind\b/i,'The Elder Scrolls'],[/\bfallout\b/i,'Fallout'],
+ [/\bbioshock\b/i,'BioShock'],[/\bborderlands\b|tales from the borderlands/i,'Borderlands'],[/\bhitman\b/i,'Hitman'],[/\bdishonored\b/i,'Dishonored'],
+ [/\bmetro (2033|last light|exodus|redux)\b/i,'Metro'],[/\bwolfenstein\b/i,'Wolfenstein'],[/\bdoom\b/i,'DOOM'],[/\bsaints row\b/i,'Saints Row'],
+ [/\bjust cause\b/i,'Just Cause'],[/\barkham\b/i,'Batman: Arkham'],[/\blego\b/i,'LEGO'],[/\bportal\b/i,'Portal'],[/\bhalf-?life\b/i,'Half-Life'],
+ [/\bleft 4 dead\b/i,'Left 4 Dead'],[/\bcounter-?strike\b|\bcs:?\s?(go|2|source)\b/i,'Counter-Strike'],[/\bdeus ex\b/i,'Deus Ex'],[/\bmafia\b/i,'Mafia'],
+ [/\bsniper elite\b|zombie army/i,'Sniper Elite'],[/\bsniper ghost warrior\b/i,'Sniper Ghost Warrior'],[/\bage of empires\b/i,'Age of Empires'],
+ [/\bcommand (&|and) conquer\b/i,'Command & Conquer'],[/\btekken\b/i,'Tekken'],[/\bmortal kombat\b/i,'Mortal Kombat'],[/\bstreet fighter\b/i,'Street Fighter'],
+ [/\bpersona \d\b/i,'Persona'],[/\byakuza\b|\blike a dragon\b/i,'Yakuza'],[/\bmetal gear\b/i,'Metal Gear'],[/\bsilent hill\b/i,'Silent Hill'],
+ [/divine divinity|divinity: |divinity original sin|divinity ii\b/i,'Divinity'],[/\bbaldur.?s gate\b/i,"Baldur's Gate"],[/\bpillars of eternity\b/i,'Pillars of Eternity'],[/\bdiablo\b/i,'Diablo'],
+ [/\bstarcraft\b/i,'StarCraft'],[/\bwarcraft\b/i,'Warcraft'],[/\btomb raider\b/i,'Tomb Raider'],[/\bsubnautica\b/i,'Subnautica'],[/\bthe evil within\b/i,'The Evil Within'],
+ [/\bfootball manager\b/i,'Football Manager'],[/\boxenfree\b/i,'Oxenfree'],[/\bsteamworld\b/i,'SteamWorld'],[/\bprison architect\b/i,'Prison Architect'],
+ [/\basterix\b/i,'Asterix'],[/\bmedal of honor\b/i,'Medal of Honor'],[/\bbrothers in arms\b/i,'Brothers in Arms'],[/\bshadow tactics\b/i,'Shadow Tactics'],
+ [/\bthief\b/i,'Thief'],[/\brise of nations\b/i,'Rise of Nations'],[/\bcompany of heroes\b/i,'Company of Heroes'],[/\bsherlock holmes\b/i,'Sherlock Holmes'],
+ [/\bcall of juarez\b/i,'Call of Juarez'],[/\bthe outer worlds\b/i,'The Outer Worlds'],[/\bremnant\b/i,'Remnant'],[/\bdeponia\b/i,'Deponia'],
+ [/\bovercooked\b/i,'Overcooked'],[/\bticket to ride\b/i,'Ticket to Ride'],[/\blayers of fear\b/i,'Layers of Fear'],[/\bdirt\b/i,'DiRT'],
+ [/\bproject cars\b/i,'Project CARS'],[/\bflatout\b/i,'FlatOut'],[/\bstar wars\b/i,'Star Wars'],[/\brayman\b/i,'Rayman'],[/\bshadowrun\b/i,'Shadowrun'],
+ [/\bthe talos principle\b/i,'The Talos Principle'],[/\ba plague tale\b/i,'A Plague Tale'],[/\bcrash bandicoot\b/i,'Crash Bandicoot'],[/\bspyro\b/i,'Spyro'],
+ [/\bgrid( \d| legends| autosport| \(|$)/i,'GRID'],[/\bworld war z\b/i,'World War Z'],[/\bhorizon chase\b/i,'Horizon Chase'],[/\bcar mechanic simulator\b/i,'Car Mechanic Simulator'],
+ [/\bthis war of mine\b/i,'This War of Mine'],[/\btitanfall\b/i,'Titanfall'],[/\bburnout\b/i,'Burnout'],[/\bplants vs\b/i,'Plants vs. Zombies'],
+ [/\bxcom\b/i,'XCOM'],[/\btropico\b/i,'Tropico'],[/\banno \d/i,'Anno'],[/\btrine\b/i,'Trine'],[/\bbayonetta\b/i,'Bayonetta'],
+ [/\bgod of war\b/i,'God of War'],[/\bjurassic world\b|\bjurassic park\b/i,'Jurassic World'],[/\bfarming simulator\b/i,'Farming Simulator'],[/\byooka-?laylee\b/i,'Yooka-Laylee'],
+ [/\btotally accurate\b/i,'Totally Accurate'],[/\bcat quest\b/i,'Cat Quest'],[/\bcostume quest\b/i,'Costume Quest'],[/\bcook, ?serve\b/i,'Cook, Serve, Delicious'],
+ [/\bmy time at\b/i,'My Time At'],[/\bhow to survive\b/i,'How to Survive'],[/\bspider-?man\b/i,"Marvel's Spider-Man"],[/\btiny tina/i,'Borderlands'],
+ [/\bdesperados\b/i,'Desperados'],[/\btrials (rising|fusion|evolution)\b/i,'Trials'],
+];
+const HEADERS=['Name','Store','Series','Release Year','Critic','SteamDB','Avg','My Rating','HLTB','HLTB Full','Price Paid','Normal Price','Added','Owned','Available On','Mark'];
+const H2F={'Name':'Name','Store':'Store','Series':'Series','Release Year':'ReleaseYear','Critic':'Critic','SteamDB':'SteamDB','Avg':'Avg','My Rating':'MyRating','HLTB':'HLTB','HLTB Full':'HLTBFull','Price Paid':'PricePaid','Normal Price':'NormalPrice','Added':'Added','Owned':'Owned','Available On':'AvailOn','Mark':'Mark'};
+
+/* ============ helpers ============ */
+const isBlank=v=>v===null||v===undefined||(typeof v==='string'&&v.trim()==='');
+function num(v){if(v===null||v===undefined)return'';if(typeof v==='number')return Number.isInteger(v)?v:Math.round(v*100)/100;if(typeof v==='string'){const t=v.trim();if(t===''||t.toLowerCase()==='nan')return'';const f=parseFloat(t);return isNaN(f)?'':(Number.isInteger(f)?f:Math.round(f*100)/100);}return'';}
+const norm=s=>String(s).toLowerCase().replace(/[^a-z0-9]/g,'');
+const EDITION_RE=/^(ultimate|premium|deluxe|gold|standard|definitive|complete|legendary|anniversary|remastered|remaster|goty|collection|bundle|celebration|enhanced|special|digital|founders?|edition|expansions?|expansion|hd|reloaded)$/;
+function stripEdition(name){
+  let s=String(name).replace(/[’`]/g,"'").trim();
+  s=s.replace(/\s*[\(\[][^)\]]*[\)\]]\s*$/,'');           // trailing (...) or [...]
+  s=s.replace(/\s*\+.*$/,'');                              // "+ Expansions / + DLC / ..."
+  s=s.replace(/\s*[:\-]\s*(game of the year|year one|complete|definitive|deluxe|ultimate|premium|gold|anniversary)\b.*$/i,'');
+  let toks=s.split(/\s+/).filter(Boolean);
+  while(toks.length>1 && EDITION_RE.test(toks[toks.length-1].toLowerCase())) toks.pop();
+  return toks.join(' ').replace(/[\s:,\-]+$/,'').trim();
+}
+const baseDisplay=name=>stripEdition(name);
+const baseKey=name=>norm(stripEdition(name));
+function computeAvg(g){const v=[g.Critic,g.SteamDB].filter(x=>x!=='');return v.length?Math.round((v.reduce((a,b)=>a+b,0)/v.length)*2)/2:'';}
+function tierFromAvg(a){if(a===''||a===undefined)return'';if(a>=90)return'top';if(a>=85)return'good';if(a>=78)return'ok';return'low';}
+function computeTier(g){if(g.Avg!=='')return tierFromAvg(g.Avg);const m=g.Mark;return m==='***'?'top':m==='**'?'good':m==='*'?'ok':'';}
+function inferSeries(name){const n=String(name).toLowerCase().replace(/[’‘`]/g,"'").replace(/_/g,' ');for(const [re,s] of SERIES_RULES){if(re.test(n))return s;}return'';}
+function finalize(g,headerSeries){g.Avg=computeAvg(g);g.Tier=computeTier(g);if(!g.Series)g.Series=inferSeries(g.Name)||(headerSeries||'');return g;}
+
+/* ============ parsing (app's own exported "Games" sheet) ============ */
+function parseClean(aoa){
+  const head=aoa[0].map(h=>String(h).trim()); const idx={}; head.forEach((h,i)=>idx[h]=i);
+  const games=[];
+  for(let r=1;r<aoa.length;r++){
+    const row=aoa[r]; if(!row||row.every(isBlank))continue;
+    const g={};
+    for(const h of HEADERS){const f=H2F[h];const v=(idx[h]===undefined?null:row[idx[h]]);
+      g[f]=(h==='Owned')?((String(v).toLowerCase()==='yes'||v===true)?'Yes':''):(['Name','Store','Series','Mark','AvailOn'].includes(f)?(v==null?'':String(v).trim()):num(v));}
+    if(!g.Name)continue; games.push(finalize(g));
+  }
+  return games;
+}
+function aoaOf(wb,name){return wb.Sheets[name]?XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:true,defval:null}):null;}
+
+/* ============ state ============ */
+let MODEL={games:[],passthrough:{},wishlist:[],ratings:[]}; let UID=1; let DIRTY=0;
+const FILTER={q:'',store:'',series:'',own:'',year:'',tier:''};
+let sortKey='Avg', sortDir=-1;
+const PAGE=100; let page=1, lastSig='';
+
+document.getElementById('file').addEventListener('change',async e=>{
+  const f=e.target.files[0]; if(!f)return;
+  const diag=document.getElementById('diag'); diag.textContent='Reading '+f.name+'…';
+  try{
+    const wb=XLSX.read(new Uint8Array(await f.arrayBuffer()),{type:'array'});
+    let games=[], passthrough={};
+    const cleanHead=wb.Sheets['Games']?XLSX.utils.sheet_to_json(wb.Sheets['Games'],{header:1,raw:true,defval:null})[0]:null;
+    if(!(cleanHead && cleanHead.includes('Name') && cleanHead.includes('Price Paid'))){
+      diag.innerHTML='This file has no “Games” sheet — load a file exported from this app (.xlsx, .ods or .csv).';return;
+    }
+    games=parseClean(aoaOf(wb,'Games'));
+    wb.SheetNames.forEach(n=>{if(n!=='Games'){const a=aoaOf(wb,n);if(a)passthrough[n]=a;}});
+    if(!games.length){diag.innerHTML='No game rows found — is this the right file?';return;}
+    games.forEach(g=>g._id=UID++);
+    MODEL={games,passthrough,wishlist:[],ratings:[],wishSheet:'Wishlists',rateSheet:'Played Games'}; DIRTY=0; updateUnsaved();
+    detectCompanion();
+    reconcileRatings();
+    const owned=games.filter(g=>g.Owned==='Yes').length, wseries=games.filter(g=>g.Series).length;
+    diag.innerHTML=`<b>${games.length}</b> games · <b>${owned}</b> owned · <b>${games.length-owned}</b> not owned · <b>${wseries}</b> with a series · <b>${MODEL.wishlist.length}</b> wishlist · <b>${MODEL.ratings.length}</b> rated`;
+    document.getElementById('loadLabel').textContent='Reload';
+    document.getElementById('empty').classList.add('hide');
+    document.getElementById('app').classList.remove('hide');
+    ['addBtn','dlBtn'].forEach(id=>document.getElementById(id).classList.remove('hide'));
+    document.getElementById('ct-lib').textContent=games.length;
+    buildHead(); buildFilters(); renderAll(); renderWishlist(); renderRatings();
+  }catch(err){diag.textContent='Could not read that file: '+err.message;}
+});
+
+/* ============ dashboard ============ */
+const fmt=n=>Math.round(n).toLocaleString();
+function renderAll(){renderDash();renderControls();renderTable();}
+function renderDash(){
+  const g=MODEL.games, owned=g.filter(x=>x.Owned==='Yes');
+  const pair=g.filter(x=>x.PricePaid!==''&&x.NormalPrice!==''&&x.NormalPrice>0);
+  const pPaid=pair.reduce((a,x)=>a+x.PricePaid,0), pRetail=pair.reduce((a,x)=>a+x.NormalPrice,0);
+  const saved=pRetail>0?Math.round((1-pPaid/pRetail)*100):0;
+  set('s-owned',fmt(owned.length));
+  set('spine-pct',saved+'%'); set('spine-paid','paid '+fmt(pPaid)); set('spine-retail','retail '+fmt(pRetail));
+  requestAnimationFrame(()=>document.getElementById('spine-fill').style.width=(pRetail>0?pPaid/pRetail*100:0)+'%');
+
+  const yr={},yrPaid={},yrRetail={};
+  g.forEach(x=>{
+    if(x.Added!==''&&x.PricePaid!=='')yr[x.Added]=(yr[x.Added]||0)+x.PricePaid;
+    if(x.Added!==''&&x.PricePaid!==''&&x.NormalPrice!==''&&x.NormalPrice>0){yrPaid[x.Added]=(yrPaid[x.Added]||0)+x.PricePaid;yrRetail[x.Added]=(yrRetail[x.Added]||0)+x.NormalPrice;}
+  });
+  const years=Object.keys(yr).sort(); const ymax=Math.max(1,...Object.values(yr));
+  document.getElementById('byyear').innerHTML=years.map(y=>{
+    const sav=yrRetail[y]?Math.round((1-yrPaid[y]/yrRetail[y])*100):null;
+    const disp=fmt(yr[y])+(sav!=null?` <span style="color:var(--mint)">·${sav}%</span>`:'');
+    return clRow('year',y,y,yr[y],ymax,'t-amber',disp);
+  }).join('')||'<p class="sub">No dated purchases</p>';
+
+  const st={}; owned.forEach(x=>st[x.Store]=(st[x.Store]||0)+1);
+  const stores=Object.entries(st).sort((a,b)=>b[1]-a[1]); const smax=Math.max(1,...stores.map(s=>s[1]));
+  document.getElementById('bystore').innerHTML=stores.map(([k,v])=>clRow('store',k,k,v,smax,'t-mint',v)).join('');
+
+  const se={}; g.forEach(x=>{if(x.Series)se[x.Series]=(se[x.Series]||0)+1;});
+  const sers=Object.entries(se).filter(([,v])=>v>=2).sort((a,b)=>b[1]-a[1]).slice(0,8); const sermax=Math.max(1,...sers.map(s=>s[1]));
+  document.getElementById('byseries').innerHTML=sers.length?sers.map(([k,v])=>clRow('series',k,k,v,sermax,'t-mint',v)).join(''):'<p class="sub">No multi-game series yet</p>';
+
+  let t2=0,t1=0,tk=0,tl=0; owned.forEach(x=>{if(x.Tier==='top')t2++;else if(x.Tier==='good')t1++;else if(x.Tier==='ok')tk++;else if(x.Tier==='low')tl++;});
+  const tmax=Math.max(1,t2,t1,tk,tl);
+  document.getElementById('tiers').innerHTML=
+    clRow('tier','top','90+',t2,tmax,'t-violet',t2)+
+    clRow('tier','good','85–89',t1,tmax,'t-green',t1)+
+    clRow('tier','ok','78–84',tk,tmax,'t-sage',tk)+
+    clRow('tier','low','< 78',tl,tmax,'t-faint',tl);
+}
+function clRow(dim,val,label,n,max,cls,disp){
+  const pct=Math.max(3,Math.round(n/max*100)); const on=FILTER[dim]===String(val)?' on':'';
+  return `<div class="clrow ${cls}${on}" data-dim="${dim}" data-val="${esc(val)}" tabindex="0">
+    <span class="nm">${esc(label)}</span><span class="track"><i style="width:${pct}%"></i></span><span class="num">${disp}</span></div>`;
+}
+['byyear','bystore','byseries','tiers'].forEach(id=>document.getElementById(id).addEventListener('click',e=>{
+  const row=e.target.closest('[data-dim]'); if(!row)return;
+  const dim=row.dataset.dim, val=row.dataset.val;
+  const turningOn=FILTER[dim]!==val;
+  FILTER[dim]=turningOn?val:'';
+  if(turningOn){
+    if(dim==='year'||dim==='store'){sortKey='PricePaid';sortDir=-1;}
+    else if(dim==='tier'||dim==='series'){sortKey='Avg';sortDir=-1;}
+  }
+  renderAll(); document.querySelector('.lib').scrollIntoView({behavior:'smooth',block:'start'});
+}));
+
+/* ============ filters + chips ============ */
+function buildFilters(){
+  const stores=[...new Set(MODEL.games.map(x=>x.Store))];
+  document.getElementById('store').innerHTML='<option value="">All stores</option>'+stores.map(s=>`<option>${esc(s)}</option>`).join('');
+  const ser=[...new Set(MODEL.games.map(x=>x.Series).filter(Boolean))].sort();
+  document.getElementById('series').innerHTML='<option value="">All series</option>'+ser.map(s=>`<option>${esc(s)}</option>`).join('');
+  ['q','store','series','own'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{
+    FILTER.q=document.getElementById('q').value.trim().toLowerCase();
+    FILTER.store=document.getElementById('store').value; FILTER.series=document.getElementById('series').value;
+    FILTER.own=document.getElementById('own').value; renderTable(); renderControls();
+  }));
+}
+function renderControls(){
+  document.getElementById('store').value=FILTER.store; document.getElementById('series').value=FILTER.series; document.getElementById('own').value=FILTER.own;
+  const lbl={store:'Store',series:'Series',own:'Show',year:'Bought',tier:'Tier',q:'Search'};
+  const chips=[];
+  for(const k of ['q','store','series','own','year','tier']){ if(!FILTER[k])continue;
+    let v=FILTER[k]; if(k==='own')v=v==='yes'?'owned':'not owned'; if(k==='tier')v=v==='top'?'90+':v==='good'?'85–89':v==='ok'?'78–84':'< 78';
+    chips.push(`<span class="chip">${lbl[k]} <b>${esc(v)}</b><button data-clr="${k}" aria-label="remove filter">×</button></span>`);
+  }
+  if(chips.length)chips.push('<span class="chip clear" id="clearAll">clear all</span>');
+  const c=document.getElementById('chips'); c.innerHTML=chips.join('');
+  c.querySelectorAll('[data-clr]').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.clr;FILTER[k]='';if(k==='q')document.getElementById('q').value='';renderAll();}));
+  const ca=document.getElementById('clearAll'); if(ca)ca.addEventListener('click',()=>{Object.keys(FILTER).forEach(k=>FILTER[k]='');document.getElementById('q').value='';renderAll();});
+}
+
+/* ============ table ============ */
+const COLS=[
+  {k:'Name',t:'Title',name:true},{k:'Store',t:'Store'},{k:'Series',t:'Series'},
+  {k:'ReleaseYear',t:'Released',num:true,year:true},{k:'Critic',t:'Critic',num:true},{k:'SteamDB',t:'SteamDB',num:true},
+  {k:'Avg',t:'Avg',num:true},{k:'MyRating',t:'Mine',num:true},{k:'HLTB',t:'HLTB',num:true},
+  {k:'PricePaid',t:'Paid',num:true},{k:'NormalPrice',t:'Normal',num:true},{k:'Added',t:'Bought',num:true,year:true},
+];
+function buildHead(){
+  document.getElementById('thead').innerHTML=COLS.map(c=>`<th data-k="${c.k}" class="${c.num?'r':''} ${c.name?'sticky-name':''}">${c.t}<span class="ar" data-ar="${c.k}"></span></th>`).join('');
+  document.querySelectorAll('#thead th').forEach(th=>th.addEventListener('click',()=>{const k=th.dataset.k;if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=(['Name','Series','Store'].includes(k))?1:-1;}renderTable();}));
+}
+document.getElementById('more').addEventListener('click',e=>{
+  const b=e.target.closest('[data-page]'); if(!b||b.disabled)return;
+  page=+b.dataset.page; renderTable();
+  document.querySelector('.lib').scrollIntoView({behavior:'smooth',block:'start'});
+});
+function currentRows(){
+  return MODEL.games.filter(g=>{
+    if(FILTER.store&&g.Store!==FILTER.store)return false;
+    if(FILTER.series&&g.Series!==FILTER.series)return false;
+    if(FILTER.own==='yes'&&g.Owned!=='Yes')return false;
+    if(FILTER.own==='no'&&g.Owned==='Yes')return false;
+    if(FILTER.year&&String(g.Added)!==String(FILTER.year))return false;
+    if(FILTER.tier&&g.Tier!==FILTER.tier)return false;
+    if(FILTER.q&&!(g.Name.toLowerCase().includes(FILTER.q)||(g.Series||'').toLowerCase().includes(FILTER.q)))return false;
+    return true;
+  });
+}
+function renderTable(){
+  let rows=currentRows();
+  rows.sort((a,b)=>{
+    const av=a[sortKey],bv=b[sortKey];
+    const ae=(av===''||av===undefined),be=(bv===''||bv===undefined);
+    if(ae&&be)return 0; if(ae)return 1; if(be)return -1;
+    const c=(typeof av==='number'&&typeof bv==='number')?av-bv:String(av).localeCompare(String(bv));
+    return c*sortDir;
+  });
+  const sig=JSON.stringify([FILTER,sortKey,sortDir]); if(sig!==lastSig){page=1;lastSig=sig;}
+  document.querySelectorAll('[data-ar]').forEach(s=>s.textContent='');
+  const ar=document.querySelector(`[data-ar="${sortKey}"]`); if(ar)ar.textContent=sortDir<0?'▾':'▴';
+  const paid=rows.reduce((a,x)=>a+(x.PricePaid===''?0:x.PricePaid),0);
+  const anyFilter=Object.values(FILTER).some(Boolean);
+  document.getElementById('lib-count').textContent=rows.length+' shown'+(anyFilter&&paid>0?' · paid '+Math.round(paid).toLocaleString():'');
+  const pages=Math.max(1,Math.ceil(rows.length/PAGE));
+  if(page>pages)page=pages; if(page<1)page=1;
+  const start=(page-1)*PAGE;
+  document.getElementById('tbody').innerHTML=rows.slice(start,start+PAGE).map(rowHTML).join('');
+  renderSeriesChart(rows);
+  const more=document.getElementById('more');
+  if(pages>1){
+    more.classList.remove('hide');
+    const btn=(p,lbl,dis)=>`<button class="pg" data-page="${p}"${dis?' disabled':''}>${lbl}</button>`;
+    const lo=start+1, hi=Math.min(start+PAGE,rows.length);
+    more.innerHTML=btn(1,'«',page<=1)+btn(page-1,'‹ Prev',page<=1)+`<span class="pgmid">${lo}–${hi} of ${rows.length} · pg ${page}/${pages}</span>`+btn(page+1,'Next ›',page>=pages)+btn(pages,'»',page>=pages);
+  }else{more.classList.add('hide');more.innerHTML='';}
+}
+function rowHTML(g){
+  const tcls=g.Tier?(' t-'+g.Tier):'';
+  const cls=(g.Owned==='Yes'?'':' unowned')+tcls;
+  return `<tr data-id="${g._id}"${cls.trim()?` class="${cls.trim()}"`:''}>`+COLS.map(c=>{
+    const v=g[c.k];
+    if(c.k==='Avg'){const t=tierFromAvg(v);const cl=t==='top'?'av-top':t==='good'?'av-good':t==='ok'?'av-ok':t==='low'?'av-low':'';const inner=v===''?'<span style="color:var(--faint)">·</span>':`<span class="${cl}">${v}</span>`;return `<td class="num">${inner}</td>`;}
+    if(c.k==='Series')return `<td class="series">${esc(v||'')}</td>`;
+    if(c.k==='Store')return `<td class="series">${esc(v)}</td>`;
+    if(c.name){const tag=g.AvailOn?`<span class="avail">also on ${esc(g.AvailOn)}</span>`:'';return `<td class="name sticky-name">${esc(v)}${tag}<span class="edit">edit</span></td>`;}
+    if(c.num){let disp;if(v==='')disp='<span style="color:var(--faint)">·</span>';else if(c.year)disp=String(v);else disp=(typeof v==='number'&&v>=1000?v.toLocaleString():v);return `<td class="num">${disp}</td>`;}
+    return `<td>${esc(v||'')}</td>`;
+  }).join('')+'</tr>';
+}
+document.getElementById('tbody').addEventListener('click',e=>{const tr=e.target.closest('tr');if(tr)openEdit(+tr.dataset.id);});
+
+/* ============ modal ============ */
+const FIELDS=[
+  ['Name','Title','text',true],['Store','Store','store'],['Series','Series','series'],
+  ['ReleaseYear','Released (year)','num'],['Critic','Critic score','num'],['SteamDB','SteamDB score','num'],
+  ['MyRating','My rating','num'],['HLTB','HLTB hours','num'],['HLTBFull','HLTB full','num'],
+  ['PricePaid','Price paid','num'],['NormalPrice','Normal price','num'],['Added','Bought (year)','num'],
+  ['AvailOn','Also owned on','text'],
+];
+let editingId=null;
+function openEdit(id){
+  editingId=id;
+  const g=id?MODEL.games.find(x=>x._id===id):{Name:'',Store:'Steam',Series:'',ReleaseYear:'',Critic:'',SteamDB:'',MyRating:'',HLTB:'',HLTBFull:'',PricePaid:'',NormalPrice:'',Added:'',AvailOn:'',Mark:'',Owned:''};
+  const serOpts=[...new Set(MODEL.games.map(x=>x.Series).filter(Boolean))].sort();
+  const storeOpts=[...new Set(MODEL.games.map(x=>x.Store).filter(Boolean))].sort();
+  const fhtml=FIELDS.map(([k,lab,type,full])=>{
+    const v=g[k]===undefined?'':g[k]; let inp;
+    if(type==='store')inp=`<input id="m-${k}" list="storelist" value="${esc(v)}" placeholder="Steam, GOG, a new store…">`;
+    else if(type==='series')inp=`<input id="m-${k}" list="serlist" value="${esc(v)}" placeholder="—">`;
+    else if(type==='mark')inp=`<select id="m-${k}"><option value="">none</option><option ${v==='*'?'selected':''}>*</option><option ${v==='**'?'selected':''}>**</option><option ${v==='***'?'selected':''}>***</option></select>`;
+    else inp=`<input id="m-${k}" ${type==='num'?'inputmode="decimal"':''} value="${esc(v)}">`;
+    return `<div class="f ${full?'full':''}"><label>${lab}</label>${inp}</div>`;
+  }).join('');
+  document.getElementById('modal').innerHTML=`
+    <div class="modal-h"><h3>${id?'Edit game':'Add game'}</h3><button class="x" id="m-x" aria-label="close">×</button></div>
+    <datalist id="serlist">${serOpts.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>
+    <datalist id="storelist">${storeOpts.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>
+    <div class="form">${fhtml}
+      <div class="f full"><label>In your library</label><div class="checkrow"><input type="checkbox" id="m-Owned" ${g.Owned==='Yes'?'checked':''}><span style="color:var(--muted);font-size:13px">Owned (auto-on when a price, year, or another store is set)</span></div></div>
+      <div class="f full"><label>Avg score (auto · colour = tier)</label><div class="ro" id="m-avg">—</div></div>
+    </div>
+    <div class="modal-f">
+      <button class="btn danger ${id?'':'hide'}" id="m-del">Delete</button>
+      <div style="display:flex;gap:9px;margin-left:auto"><button class="btn ghost" id="m-cancel">Cancel</button><button class="btn primary" id="m-save">${id?'Save changes':'Add game'}</button></div>
+    </div>`;
+  document.getElementById('scrim').classList.remove('hide');
+  ['Critic','SteamDB','Mark'].forEach(k=>{const el=document.getElementById('m-'+k);if(el)el.addEventListener('input',liveAuto);});
+  liveAuto();
+  document.getElementById('m-x').onclick=closeModal; document.getElementById('m-cancel').onclick=closeModal; document.getElementById('m-save').onclick=saveModal;
+  const del=document.getElementById('m-del'); if(del)del.onclick=deleteModal;
+  document.getElementById('modal').onkeydown=ev=>{if(ev.key==='Enter'&&ev.target.tagName!=='TEXTAREA'){ev.preventDefault();saveModal();}};
+  setTimeout(()=>document.getElementById('m-Name').focus(),30);
+}
+function readModal(){
+  const g={};
+  for(const [k,,type] of FIELDS){const el=document.getElementById('m-'+k);let v=el.value;g[k]=(type==='num')?num(v):(typeof v==='string'?v.trim():v);}
+  g.Owned=document.getElementById('m-Owned').checked?'Yes':'';
+  return g;
+}
+function liveAuto(){const g=readModal();const a=computeAvg(g),t=tierFromAvg(a);const el=document.getElementById('m-avg');el.textContent=a===''?'—':(a+(t==='top'?'  ·  top tier':t==='good'?'  ·  good':t==='ok'?'  ·  ok':'  ·  low'));el.style.color=t==='top'?'var(--q1)':t==='good'?'var(--q2)':t==='ok'?'var(--q3)':'var(--text)';}
+function saveModal(){
+  const data=readModal();
+  if(!data.Name){alert('Give the game a title.');return;}
+  if(!editingId){const dup=MODEL.games.find(x=>norm(x.Name)===norm(data.Name)&&x.Store===data.Store);if(dup&&!confirm('“'+data.Name+'” already exists in '+data.Store+'. Add it again anyway?'))return;}
+  const existing=editingId?MODEL.games.find(x=>x._id===editingId):null;
+  data.Mark=existing?(existing.Mark||''):'';
+  if(!data.Owned && (data.AvailOn||data.PricePaid!==''||data.Added!==''))data.Owned='Yes';
+  finalize(data);
+  if(existing){Object.assign(existing,data);}else{data._id=UID++;MODEL.games.push(data);}
+  setRating(data.Name,data.MyRating);
+  DIRTY++; updateUnsaved(); closeModal(); buildFilters(); renderAll(); renderRatings();
+}
+function deleteModal(){
+  if(!editingId)return;
+  if(!confirm('Remove this game from your library?'))return;
+  MODEL.games=MODEL.games.filter(x=>x._id!==editingId);
+  DIRTY++; updateUnsaved(); closeModal(); buildFilters(); renderAll();
+}
+function closeModal(){document.getElementById('scrim').classList.add('hide');editingId=null;}
+document.getElementById('scrim').addEventListener('click',e=>{if(e.target.id==='scrim')closeModal();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!document.getElementById('scrim').classList.contains('hide'))closeModal();});
+document.getElementById('addBtn').addEventListener('click',()=>openEdit(0));
+
+/* ============ download ============ */
+function updateUnsaved(){const u=document.getElementById('unsaved');if(DIRTY>0){u.classList.remove('hide');u.textContent='● '+DIRTY+' unsaved edit'+(DIRTY>1?'s':'')+' — download to keep';}else u.classList.add('hide');}
+function buildWorkbook(){
+  const wb=XLSX.utils.book_new();
+  const bn=v=>(v===''||v===undefined)?null:v;
+  const data=[HEADERS, ...MODEL.games.map(g=>HEADERS.map(h=>bn(g[H2F[h]])))];
+  const gws=XLSX.utils.aoa_to_sheet(data);
+  // Avg (col G) as a live formula = rounded average of Critic (E) and SteamDB (F)
+  MODEL.games.forEach((g,i)=>{ if(g.Avg!==''){ const r=i+1; const cell=XLSX.utils.encode_cell({r,c:6}); const E=XLSX.utils.encode_cell({r,c:4}), F=XLSX.utils.encode_cell({r,c:5}); gws[cell]={t:'n',f:`IF(COUNT(${E},${F})=0,"",ROUND(AVERAGE(${E},${F})*2,0)/2)`,v:g.Avg}; } });
+  XLSX.utils.book_append_sheet(wb, gws, 'Games');
+  if((MODEL.wishlist||[]).length){const wd=[['Released','Game','Critic','Steam','HLTB','HLTB Full','Notes','Bought?'],...MODEL.wishlist.map(w=>[bn(w.Year),bn(w.Game),bn(w.Critic),bn(w.Steam),bn(w.HLTB),bn(w.HLTBFull),bn(w.Note),w.Bought?'Yes':null])];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(wd),(MODEL.wishSheet||'Wishlists').slice(0,31));}
+  if((MODEL.ratings||[]).length){const rd=[['Game','Rating'],...MODEL.ratings.map(x=>[x.Game,bn(x.Rating)])];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rd),(MODEL.rateSheet||'Played Games').slice(0,31));}
+  for(const [src,a] of Object.entries(MODEL.passthrough||{})){const nm=src.slice(0,31);if(!wb.SheetNames.includes(nm))XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(a), nm);}
+  return wb;
+}
+function stamp(){const d=new Date(),p=n=>String(n).padStart(2,'0');return `GM_${p(d.getDate())}${p(d.getMonth()+1)}${String(d.getFullYear()).slice(-2)}_${p(d.getHours())}-${p(d.getMinutes())}`;}
+function download(fmt){
+  try{
+    const wb=buildWorkbook();
+    if(fmt==='csv'){saveBlob(new Blob([XLSX.utils.sheet_to_csv(wb.Sheets['Games'])],{type:'text/csv'}),stamp()+'.csv');}
+    else{const out=XLSX.write(wb,{bookType:fmt,type:'array'});saveBlob(new Blob([out],{type:'application/octet-stream'}),stamp()+'.'+fmt);}
+    DIRTY=0; updateUnsaved();
+  }catch(err){alert('Download failed: '+err.message+'\nTry the .xlsx option.');}
+}
+function saveBlob(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);}
+const dlMenu=document.getElementById('dlMenu');
+document.getElementById('dlBtn').addEventListener('click',e=>{e.stopPropagation();dlMenu.classList.toggle('hide');});
+document.addEventListener('click',e=>{if(!e.target.closest('.menu'))dlMenu.classList.add('hide');});
+dlMenu.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{dlMenu.classList.add('hide');download(b.dataset.fmt);}));
+
+/* ============ series chart ============ */
+function renderSeriesChart(rows){
+  const el=document.getElementById('serieschart');
+  if(!FILTER.series){el.classList.add('hide');el.innerHTML='';return;}
+  const pts=rows.filter(g=>g.Critic!==''||g.SteamDB!==''||g.MyRating!=='');
+  pts.sort((a,b)=>{const ay=a.ReleaseYear===''?9999:a.ReleaseYear,by=b.ReleaseYear===''?9999:b.ReleaseYear;return ay-by||cmp(a.Name,b.Name);});
+  if(pts.length<2){el.classList.add('hide');el.innerHTML='';return;}
+  el.classList.remove('hide');
+  el.innerHTML=`<p class="ttl">${esc(FILTER.series)} — scores across the series</p>
+    <div class="leg"><span class="c1">Critic</span><span class="c2">SteamDB</span><span class="c3">My rating ×10</span></div>`+svgChart(pts);
+}
+function svgChart(pts){
+  const n=pts.length, W=Math.max(340,n*72), H=200, padL=32,padR=14,padT=12,padB=52;
+  const ix=i=>padL+(n===1?0:i*(W-padL-padR)/(n-1));
+  const yMin=40,yMax=100, iy=v=>padT+(1-(Math.max(yMin,Math.min(yMax,v))-yMin)/(yMax-yMin))*(H-padT-padB);
+  const grid=[40,55,70,85,100].map(v=>`<line x1="${padL}" y1="${iy(v)}" x2="${W-padR}" y2="${iy(v)}" stroke="var(--line)"/><text x="${padL-5}" y="${iy(v)+3}" text-anchor="end" font-size="9" fill="var(--faint)" font-family="IBM Plex Mono,monospace">${v}</text>`).join('');
+  const line=(key,color,mult)=>{let d='',started=false;const dots=[];pts.forEach((g,i)=>{let val=g[key];if(val==='')return;val*=(mult||1);const x=ix(i),y=iy(val);d+=(started?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)+' ';started=true;dots.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.2" fill="${color}"><title>${esc(g.Name)} — ${key}: ${g[key]}</title></circle>`);});return (d?`<path d="${d}" fill="none" stroke="${color}" stroke-width="2"/>`:'')+dots.join('');};
+  const showNames=n<=10;
+  const xlab=pts.map((g,i)=>`<text x="${ix(i)}" y="${H-padB+16}" text-anchor="middle" font-size="9" fill="var(--faint)" font-family="IBM Plex Mono,monospace">${g.ReleaseYear||''}</text>`+(showNames?`<text x="${ix(i)}" y="${H-padB+28}" text-anchor="middle" font-size="8" fill="var(--faint)">${esc((g.Name||'').slice(0,12))}</text>`:'')).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="series scores">${grid}${line('Critic','var(--mint)')}${line('SteamDB','var(--violet)')}${line('MyRating','var(--amber)',10)}${xlab}</svg>`;
+}
+
+/* ============ wishlist + ratings (editable) ============ */
+function parseWishlistAoa(a){
+  if(!a||!a.length)return [];
+  const head=a[0].map(x=>String(x==null?'':x).toLowerCase());
+  const find=re=>head.findIndex(x=>re.test(x));
+  const gi=find(/game/),yi=find(/year|released/),hi=head.findIndex(x=>x==='hltb'),hei=find(/ex|full/),ci=find(/critic/),si=find(/steam/),ni=find(/\+ve|side|note/),bi=head.findIndex(x=>x==='bought?'||x==='bought'||/purchased|already/.test(x));
+  const out=[];
+  for(let r=1;r<a.length;r++){const row=a[r];const nm=gi>=0?row[gi]:null;if(nm==null||String(nm).trim()==='')continue;
+    out.push({_id:UID++,Year:yi>=0?num(row[yi]):'',Game:String(nm).trim(),Critic:ci>=0?num(row[ci]):'',Steam:si>=0?num(row[si]):'',HLTB:hi>=0?num(row[hi]):'',HLTBFull:hei>=0?num(row[hei]):'',Note:(ni>=0&&row[ni]!=null)?String(row[ni]).trim():'',Bought:bi>=0?/^(yes|true|1|✓|x|bought)$/i.test(String(row[bi]==null?'':row[bi]).trim()):false});}
+  return out;
+}
+function parseRatingsAoa(a){
+  if(!a||!a.length)return [];
+  const head=a[0].map(x=>String(x==null?'':x).toLowerCase());
+  const ri=head.findIndex(x=>x.includes('rating'));
+  const out=[];
+  for(let r=1;r<a.length;r++){const row=a[r];const nm=row[0];if(nm==null||String(nm).trim()==='')continue;const low=String(nm).trim().toLowerCase();if(low==='older'||low==='newer'||low==='liked')continue;const rt=ri>=0?num(row[ri]):'';if(rt==='')continue;out.push({_id:UID++,Game:String(nm).trim(),Rating:rt});}
+  out.sort((a,b)=>b.Rating-a.Rating);
+  return out;
+}
+function detectCompanion(){
+  const pt=MODEL.passthrough||{}; let wName=null,rName=null;
+  for(const [name,a] of Object.entries(pt)){ if(!a||!a.length)continue;
+    const h=a[0].map(x=>String(x==null?'':x).toLowerCase());
+    if(!wName && h.some(x=>x.includes('game')) && h.some(x=>/critic|steam|hltb/.test(x))) wName=name;
+    else if(!rName && h.some(x=>x.includes('rating'))) rName=name;
+  }
+  MODEL.wishSheet=wName||'Wishlists'; MODEL.rateSheet=rName||'Played Games';
+  MODEL.wishlist=wName?parseWishlistAoa(pt[wName]):[];
+  MODEL.ratings=rName?parseRatingsAoa(pt[rName]):[];
+  if(wName)delete MODEL.passthrough[wName];
+  if(rName)delete MODEL.passthrough[rName];
+}
+/* one clean rating per base game (special editions collapse); fills every matching edition */
+function syncRatingsToGames(){
+  const m=new Map(MODEL.ratings.map(r=>[r.key,r.Rating]));
+  for(const g of MODEL.games){const k=baseKey(g.Name);g.MyRating=m.has(k)?m.get(k):'';}
+}
+function reconcileRatings(){
+  const map=new Map();
+  for(const r of (MODEL.ratings||[])){const k=baseKey(r.Game);if(!map.has(k))map.set(k,{Game:baseDisplay(r.Game),Rating:r.Rating});}
+  for(const g of MODEL.games){if(g.MyRating!==''){const k=baseKey(g.Name);if(!map.has(k))map.set(k,{Game:baseDisplay(g.Name),Rating:g.MyRating});}}
+  MODEL.ratings=[...map.entries()].map(([k,v])=>({_id:UID++,key:k,Game:v.Game,Rating:v.Rating})).sort((a,b)=>b.Rating-a.Rating);
+  syncRatingsToGames();
+}
+function setRating(name,rating){
+  const k=baseKey(name);let e=MODEL.ratings.find(r=>r.key===k);
+  if(rating===''||rating==null){if(e)MODEL.ratings=MODEL.ratings.filter(r=>r!==e);}
+  else if(e){e.Rating=rating;}
+  else MODEL.ratings.push({_id:UID++,key:k,Game:baseDisplay(name),Rating:rating});
+  MODEL.ratings.sort((a,b)=>b.Rating-a.Rating); syncRatingsToGames();
+}
+function emptyRow(n){return `<tr><td colspan="${n}" style="text-align:center;color:var(--faint);padding:26px">Nothing here yet — tap Add</td></tr>`;}
+function renderWishlist(){
+  const q=(document.getElementById('wq').value||'').trim().toLowerCase();
+  const list=MODEL.wishlist||[];
+  let rows=list.filter(w=>!q||w.Game.toLowerCase().includes(q)||(w.Note||'').toLowerCase().includes(q));
+  rows.sort((a,b)=>(a.Bought?1:0)-(b.Bought?1:0));
+  const bought=list.filter(w=>w.Bought).length;
+  document.getElementById('ct-wish').textContent=list.length;
+  document.getElementById('wish-count').textContent=rows.length+' shown'+(bought?' · '+bought+' bought':'');
+  document.getElementById('wthead').innerHTML=['Released','Game','Critic','Steam','HLTB','HLTB Full','Notes'].map((h,i)=>`<th class="${(i>=2&&i<=5)||i===0?'r':''} ${i===1?'sticky-name':''}">${h}</th>`).join('');
+  document.getElementById('wbody').innerHTML=rows.map(w=>`<tr data-wid="${w._id}"${w.Bought?' class="bought"':''}><td class="num">${w.Year===''?'':w.Year}</td><td class="name sticky-name"><input type="checkbox" class="wbk" ${w.Bought?'checked':''} title="Already bought"><span class="wgame">${esc(w.Game)}</span><span class="edit">edit</span></td><td class="num">${w.Critic===''?'·':w.Critic}</td><td class="num">${w.Steam===''?'·':w.Steam}</td><td class="num">${w.HLTB===''?'·':w.HLTB}</td><td class="num">${w.HLTBFull===''?'·':w.HLTBFull}</td><td class="series">${esc(w.Note||'')}</td></tr>`).join('')||emptyRow(7);
+}
+function renderRatings(){
+  const q=(document.getElementById('rq').value||'').trim().toLowerCase();
+  const list=MODEL.ratings||[];
+  const rows=list.filter(x=>!q||x.Game.toLowerCase().includes(q));
+  document.getElementById('ct-rate').textContent=list.length;
+  document.getElementById('rate-count').textContent=rows.length+' shown';
+  document.getElementById('rthead').innerHTML=['Game','My rating',''].map((h,i)=>`<th class="${i===1?'r':''} ${i===0?'sticky-name':''}">${h}</th>`).join('');
+  document.getElementById('rbody').innerHTML=rows.map(x=>{const pct=Math.max(4,Math.round((x.Rating||0)/10*100));const cl=x.Rating>=8?'av-top':x.Rating>=6.5?'av-good':'av-ok';return `<tr data-rid="${x._id}"><td class="name sticky-name">${esc(x.Game)}<span class="edit">edit</span></td><td class="num"><span class="${cl}">${x.Rating}</span><span style="color:var(--faint)">/10</span></td><td><span style="display:inline-block;width:140px;height:8px;border-radius:5px;background:var(--raised);overflow:hidden;vertical-align:middle"><i style="display:block;height:100%;width:${pct}%;background:linear-gradient(90deg,#5f53b8,var(--violet))"></i></span></td></tr>`;}).join('')||emptyRow(3);
+}
+/* generic mini editor for a row object */
+function openMini(title,fields,obj,onSave,onDelete){
+  const isNew=!obj;
+  const o=obj||{}; 
+  const fh=fields.map(([k,lab,type])=>{const v=o[k]===undefined||o[k]===''?'':o[k];return `<div class="f ${type==='wide'?'full':''}"><label>${lab}</label><input id="mm-${k}" ${type==='num'?'inputmode="decimal"':''} value="${esc(v)}"></div>`;}).join('');
+  document.getElementById('modal').innerHTML=`
+    <div class="modal-h"><h3>${title}</h3><button class="x" id="mm-x" aria-label="close">×</button></div>
+    <div class="form">${fh}</div>
+    <div class="modal-f"><button class="btn danger ${isNew?'hide':''}" id="mm-del">Delete</button>
+      <div style="display:flex;gap:9px;margin-left:auto"><button class="btn ghost" id="mm-cancel">Cancel</button><button class="btn primary" id="mm-save">${isNew?'Add':'Save'}</button></div></div>`;
+  document.getElementById('scrim').classList.remove('hide');
+  const read=()=>{const r={};for(const [k,,type] of fields){let v=document.getElementById('mm-'+k).value;r[k]=type==='num'?num(v):v.trim();}return r;};
+  document.getElementById('mm-x').onclick=closeModal; document.getElementById('mm-cancel').onclick=closeModal;
+  document.getElementById('mm-save').onclick=()=>{const r=read();if(!r[fields[0][0]]){alert('Fill in '+fields[0][1]+'.');return;}onSave(r);DIRTY++;updateUnsaved();closeModal();};
+  const del=document.getElementById('mm-del'); if(del&&!isNew)del.onclick=()=>{if(confirm('Delete this row?')){onDelete();DIRTY++;updateUnsaved();closeModal();}};
+  document.getElementById('modal').onkeydown=ev=>{if(ev.key==='Enter'){ev.preventDefault();document.getElementById('mm-save').click();}};
+  setTimeout(()=>document.getElementById('mm-'+fields[0][0]).focus(),30);
+}
+const WISH_FIELDS=[['Game','Game','wide'],['Year','Released (year)','num'],['Critic','Critic','num'],['Steam','Steam','num'],['HLTB','HLTB hours','num'],['HLTBFull','HLTB full','num'],['Note','Notes','wide']];
+const RATE_FIELDS=[['Game','Game','wide'],['Rating','My rating (0–10)','num']];
+function editWish(id){const w=MODEL.wishlist.find(x=>x._id===id);openMini('Edit wishlist item',WISH_FIELDS,w,r=>{Object.assign(w,r);renderWishlist();},()=>{MODEL.wishlist=MODEL.wishlist.filter(x=>x._id!==id);renderWishlist();});}
+function editRate(id){const x=MODEL.ratings.find(v=>v._id===id);openMini('Edit rating',RATE_FIELDS,x,r=>{x.Game=baseDisplay(r.Game);x.Rating=r.Rating;x.key=baseKey(r.Game);MODEL.ratings.sort((a,b)=>b.Rating-a.Rating);syncRatingsToGames();renderRatings();renderTable();},()=>{MODEL.ratings=MODEL.ratings.filter(v=>v._id!==id);syncRatingsToGames();renderRatings();renderTable();});}
+document.getElementById('wbody').addEventListener('click',e=>{
+  const cb=e.target.closest('.wbk');
+  if(cb){const tr=e.target.closest('[data-wid]');const w=MODEL.wishlist.find(x=>x._id===+tr.dataset.wid);if(w){w.Bought=cb.checked;DIRTY++;updateUnsaved();renderWishlist();}return;}
+  const tr=e.target.closest('[data-wid]');if(tr)editWish(+tr.dataset.wid);
+});
+document.getElementById('rbody').addEventListener('click',e=>{const tr=e.target.closest('[data-rid]');if(tr)editRate(+tr.dataset.rid);});
+document.getElementById('wadd').addEventListener('click',()=>openMini('Add wishlist item',WISH_FIELDS,null,r=>{r._id=UID++;MODEL.wishlist.push(r);renderWishlist();}));
+document.getElementById('radd').addEventListener('click',()=>openMini('Add rating',RATE_FIELDS,null,r=>{MODEL.ratings.push({_id:UID++,key:baseKey(r.Game),Game:baseDisplay(r.Game),Rating:r.Rating});MODEL.ratings.sort((a,b)=>b.Rating-a.Rating);syncRatingsToGames();renderRatings();renderTable();}));
+document.getElementById('wq').addEventListener('input',renderWishlist);
+document.getElementById('rq').addEventListener('input',renderRatings);
+document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(!b)return;const t=b.dataset.tab;document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));['library','wishlist','ratings'].forEach(p=>document.getElementById('tab-'+p).classList.toggle('hide',p!==t));});
+
+/* ============ util ============ */
+function set(id,t){document.getElementById(id).textContent=t;}
+function cmp(a,b){const ae=a===''||a===undefined,be=b===''||b===undefined;if(ae&&be)return 0;if(ae)return 1;if(be)return -1;if(typeof a==='number'&&typeof b==='number')return a-b;return String(a).localeCompare(String(b));}
+function esc(s){return String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+window.addEventListener('beforeunload',e=>{if(DIRTY>0){e.preventDefault();e.returnValue='';}});
+document.getElementById('foot').innerHTML='Read and edited entirely in your browser — your file never leaves this device. Edits live in memory; use <b>Download</b> to save an updated file (it reloads straight back into this app, with your wishlist and bundles carried along). <b>Added</b> = year a game entered your collection; <b>Owned</b> is inferred from price, added-year, or a mark; <b>Series</b> comes from your sheet’s groupings plus franchise matching — fix any in the edit popup.';
+</script>
+</body>
+</html>
