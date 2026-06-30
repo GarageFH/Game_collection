@@ -183,8 +183,6 @@
   .f input,.f select{background:var(--raised);border:1px solid var(--line);color:var(--text);border-radius:9px;padding:9px 11px;font-family:"Hanken Grotesk",sans-serif;font-size:14px;outline:none}
   .f input:focus,.f select:focus{border-color:var(--mint)}
   .f .ro{color:var(--faint);font-family:"IBM Plex Mono",monospace;font-size:13px;padding:9px 11px;border:1px dashed var(--line);border-radius:9px}
-  .checkrow{display:flex;align-items:center;gap:9px}
-  .checkrow input{width:18px;height:18px;accent-color:var(--mint)}
   .modal-f{display:flex;justify-content:space-between;gap:10px;padding:16px 20px;border-top:1px solid var(--line);position:sticky;bottom:0;background:var(--panel)}
   .btn.danger{background:transparent;border-color:rgba(232,93,93,.4);color:#e57a7a}
   .btn.danger:hover{border-color:#e57a7a}
@@ -224,15 +222,15 @@
           <button data-fmt="csv">Games as CSV</button>
         </div>
       </div>
-      <label class="btn ghost"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7 9m5-5l5 5M4 20h16"/></svg><span id="loadLabel">Open file</span><input type="file" id="file" accept=".ods,.xlsx,.xls"></label>
+      <label class="btn ghost"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7 9m5-5l5 5M4 20h16"/></svg><span id="loadLabel">Open file</span><input type="file" id="file" accept=".xlsx,.ods,.csv,.xls"></label>
     </div>
   </div>
 
   <section id="empty" class="empty">
     <div class="ring"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg></div>
     <div class="big">Load your library to begin</div>
-    <p>Open your game file from Drive or your phone. It’s read in your browser; nothing is uploaded. Edit freely, then download an updated file to keep.</p>
-    <label class="btn primary" style="display:inline-flex"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7 9m5-5l5 5M4 20h16"/></svg>Choose file<input type="file" accept=".ods,.xlsx,.xls" onchange="document.getElementById('file').files=this.files;document.getElementById('file').dispatchEvent(new Event('change'))"></label>
+    <p>Open a file you exported from this app (<b>.xlsx</b>, <b>.ods</b>, or <b>.csv</b>) — from Drive or your phone. It’s read in your browser; nothing is uploaded. Edit freely, then download an updated file to keep.</p>
+    <label class="btn primary" style="display:inline-flex"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7 9m5-5l5 5M4 20h16"/></svg>Choose file<input type="file" accept=".xlsx,.ods,.csv,.xls" onchange="document.getElementById('file').files=this.files;document.getElementById('file').dispatchEvent(new Event('change'))"></label>
   </section>
 
   <main id="app" class="hide">
@@ -365,7 +363,7 @@ function tierFromAvg(a){if(a===''||a===undefined)return'';if(a>=90)return'top';i
 function computeMark(g){const n=(g.Critic!==''&&g.Critic>=80?1:0)+(g.SteamDB!==''&&g.SteamDB>=80?1:0);return n===2?'**':n===1?'*':'';}
 function computeTier(g){return tierFromAvg(g.Avg);}
 function inferSeries(name){const n=String(name).toLowerCase().replace(/[’‘`]/g,"'").replace(/_/g,' ');for(const [re,s] of SERIES_RULES){if(re.test(n))return s;}return'';}
-function finalize(g,headerSeries){g.Avg=computeAvg(g);g.Mark=computeMark(g);g.Tier=computeTier(g);if(!g.Series)g.Series=inferSeries(g.Name)||(headerSeries||'');return g;}
+function finalize(g,headerSeries){g.Owned=(g.Store||g.AvailOn||g.PricePaid!==''||g.Added!=='')?'Yes':'';if(g.Owned!=='Yes'){g.Store='';g.AvailOn='';}g.Avg=computeAvg(g);g.Mark=computeMark(g);g.Tier=computeTier(g);if(!g.Series)g.Series=inferSeries(g.Name)||(headerSeries||'');return g;}
 
 /* ============ parsing (app's own exported "Games" sheet) ============ */
 function parseClean(aoa){
@@ -475,7 +473,7 @@ function clRow(dim,val,label,n,max,cls,disp){
 
 /* ============ filters + chips ============ */
 function buildFilters(){
-  const stores=[...new Set(MODEL.games.map(x=>x.Store))];
+  const stores=[...new Set(MODEL.games.map(x=>x.Store).filter(Boolean))].sort();
   document.getElementById('store').innerHTML='<option value="">All stores</option>'+stores.map(s=>`<option>${esc(s)}</option>`).join('');
   const ser=[...new Set(MODEL.games.map(x=>x.Series).filter(Boolean))].sort();
   document.getElementById('series').innerHTML='<option value="">All series</option>'+ser.map(s=>`<option>${esc(s)}</option>`).join('');
@@ -562,7 +560,7 @@ function rowHTML(g){
   return `<tr data-id="${g._id}"${cls?` class="${cls}"`:''}>`+COLS.map(c=>{
     const v=g[c.k];
     if(c.k==='Avg'){const t=tierFromAvg(v);const cl=t==='top'?'av-top':t==='good'?'av-good':t==='ok'?'av-ok':t==='low'?'av-low':'';const inner=v===''?'<span style="color:var(--faint)">·</span>':`<span class="${cl}">${v}</span>`;return `<td class="num">${inner}</td>`;}
-    if(c.k==='HLTB'){const disp=(v==='')?'<span style="color:var(--faint)">·</span>':(Math.round(v*1.5*2)/2);return `<td class="num">${disp}</td>`;}
+    if(c.k==='HLTB'){const disp=(v==='')?'<span style="color:var(--faint)">·</span>':Math.round(v*1.5);return `<td class="num">${disp}</td>`;}
     if(c.k==='Series')return `<td class="series">${esc(v||'')}</td>`;
     if(c.k==='Store')return `<td class="series">${esc(v)}</td>`;
     if(c.name){const tag=g.AvailOn?`<span class="avail">also on ${esc(g.AvailOn)}</span>`:'';return `<td class="name sticky-name">${dots}${esc(v)}${tag}<span class="edit">edit</span></td>`;}
@@ -599,7 +597,7 @@ function openEdit(id){
     <datalist id="serlist">${serOpts.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>
     <datalist id="storelist">${storeOpts.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>
     <div class="form">${fhtml}
-      <div class="f full"><label>In your library</label><div class="checkrow"><input type="checkbox" id="m-Owned" ${g.Owned==='Yes'?'checked':''}><span style="color:var(--muted);font-size:13px">Owned (auto-on when a price, year, or another store is set)</span></div></div>
+      <div class="f full"><label>In your library</label><div style="color:var(--muted);font-size:13px">Counted as owned automatically once it has a store (or a price, year, or “also on”).</div></div>
       <div class="f full"><label>Avg score (auto · colour = tier)</label><div class="ro" id="m-avg">—</div></div>
     </div>
     <div class="modal-f">
@@ -617,7 +615,6 @@ function openEdit(id){
 function readModal(){
   const g={};
   for(const [k,,type] of FIELDS){const el=document.getElementById('m-'+k);let v=el.value;g[k]=(type==='num')?num(v):(typeof v==='string'?v.trim():v);}
-  g.Owned=document.getElementById('m-Owned').checked?'Yes':'';
   return g;
 }
 function liveAuto(){const g=readModal();const a=computeAvg(g),t=tierFromAvg(a);const el=document.getElementById('m-avg');el.textContent=a===''?'—':(a+(t==='top'?'  ·  top tier':t==='good'?'  ·  good':t==='ok'?'  ·  ok':'  ·  low'));el.style.color=t==='top'?'var(--q1)':t==='good'?'var(--q2)':t==='ok'?'var(--q3)':'var(--text)';}
@@ -626,7 +623,6 @@ function saveModal(){
   if(!data.Name){alert('Give the game a title.');return;}
   if(!editingId){const dup=MODEL.games.find(x=>norm(x.Name)===norm(data.Name)&&x.Store===data.Store);if(dup&&!confirm('“'+data.Name+'” already exists in '+data.Store+'. Add it again anyway?'))return;}
   const existing=editingId?MODEL.games.find(x=>x._id===editingId):null;
-  if(!data.Owned && (data.AvailOn||data.PricePaid!==''||data.Added!==''))data.Owned='Yes';
   finalize(data);
   if(existing){Object.assign(existing,data);}else{data._id=UID++;MODEL.games.push(data);}
   setRating(data.Name,data.MyRating);
@@ -811,7 +807,7 @@ function set(id,t){document.getElementById(id).textContent=t;}
 function cmp(a,b){const ae=a===''||a===undefined,be=b===''||b===undefined;if(ae&&be)return 0;if(ae)return 1;if(be)return -1;if(typeof a==='number'&&typeof b==='number')return a-b;return String(a).localeCompare(String(b));}
 function esc(s){return String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
 window.addEventListener('beforeunload',e=>{if(DIRTY>0){e.preventDefault();e.returnValue='';}});
-document.getElementById('foot').innerHTML='Read and edited entirely in your browser — your file never leaves this device. Edits live in memory; use <b>Download</b> to save an updated file (it reloads straight back into this app, with your wishlist and bundles carried along). <b>Added</b> = year a game entered your collection; <b>Owned</b> is inferred from price, added-year, or a mark; <b>Series</b> comes from your sheet’s groupings plus franchise matching — fix any in the edit popup.';
+document.getElementById('foot').innerHTML='Read and edited entirely in your browser — your file never leaves this device. Edits live in memory; use <b>Download</b> to save an updated file (it reloads straight back into this app, with your wishlist and bundles carried along). <b>Added</b> = year a game entered your collection; <b>Owned</b> is inferred from having a store, price, year, or “also on”; <b>Series</b> comes from your sheet’s groupings plus franchise matching — fix any in the edit popup.';
 </script>
 </body>
 </html>
