@@ -14,6 +14,7 @@
     --text:#f3f4f9; --muted:#b4bccd; --faint:#828aa3;
     --amber:#f3ad3e; --mint:#5fe0cb; --violet:#a99cff;
     --q1:#a99cff; --q2:#3ee07f; --q3:#8fbfa3;
+    --dot-gray:#5f6775; --dot-ring:#7b8494;
   }
   *{box-sizing:border-box}
   html,body{margin:0}
@@ -117,7 +118,7 @@
   tbody td{padding:9px 12px;border-bottom:1px solid rgba(44,49,66,.55);white-space:nowrap}
   tbody tr{cursor:pointer}
   tbody tr:hover td{background:rgba(95,211,192,.05)}
-  td.name{white-space:normal;min-width:200px;font-weight:600}
+  td.name{white-space:normal;min-width:200px;font-weight:600;padding-left:26px}
   td.name .edit{opacity:0;color:var(--mint);font-size:11px;margin-left:7px;font-family:"IBM Plex Mono",monospace}
   tbody tr:hover td.name .edit{opacity:1}
   td.num{font-family:"IBM Plex Mono",monospace;text-align:right}
@@ -142,19 +143,21 @@
   /* owned indicated by color, not a column */
   tbody tr.unowned td{color:var(--muted)}
   tbody tr.unowned td.name{color:var(--muted);font-weight:500}
-  tbody tr.unowned{background:rgba(255,255,255,.05)}
-  tbody tr.unowned td.sticky-name{background:#262a35}
-  tbody tr.unowned:hover td{background:rgba(255,255,255,.085)}
-  tbody tr.unowned:hover td.sticky-name{background:#2d313e}
-  /* quality ribbon: 3 brightness levels of green by tier (top/good/ok) */
-  tbody tr.t-top  td.sticky-name{box-shadow:inset 4px 0 0 var(--q1)}
-  tbody tr.t-good td.sticky-name{box-shadow:inset 4px 0 0 var(--q2)}
-  tbody tr.t-ok   td.sticky-name{box-shadow:inset 4px 0 0 var(--q3)}
+  tbody tr.unowned{background:rgba(255,255,255,.085)}
+  tbody tr.unowned td.sticky-name{background:#2e323d}
+  tbody tr.unowned:hover td{background:rgba(255,255,255,.12)}
+  tbody tr.unowned:hover td.sticky-name{background:#373c47}
+  /* score dots before the name — left = Metacritic, right = SteamDB; colour = that score's tier */
+  .dots{position:absolute;left:6px;top:50%;transform:translateY(-50%);display:inline-flex;gap:4px}
+  .dot{width:7px;height:7px;border-radius:50%;box-sizing:border-box;flex:none}
+  .dot.d-violet{background:var(--q1)}
+  .dot.d-green{background:var(--q2)}
+  .dot.d-sage{background:var(--q3);border:1.5px solid var(--dot-ring)}
+  .dot.d-gray{background:var(--dot-gray);border:1.5px solid var(--dot-ring)}
+  .dot.none{background:transparent;border:1.5px solid var(--dot-ring)}
   .avail{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:1px 5px;margin-left:7px;vertical-align:middle}
   .legend{display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);margin:2px 0 9px}
   .legend i{display:inline-block;width:16px;height:11px;border-radius:3px;vertical-align:middle;margin-right:5px;background:#262a35}
-  .rib{display:inline-block;width:5px;height:12px;border-radius:2px;vertical-align:middle;margin-right:2px}
-  .rib3{background:var(--q1)} .rib2{background:var(--q2)} .rib1{background:var(--q3)}
   .av-top{color:var(--q1);font-weight:700} .av-good{color:var(--q2);font-weight:700} .av-ok{color:var(--q3);font-weight:600} .av-low{color:var(--text)}
   .wbk{accent-color:var(--mint);width:15px;height:15px;margin-right:8px;vertical-align:middle;cursor:pointer}
   tbody tr.bought td{color:var(--faint)}
@@ -268,7 +271,7 @@
           <select id="own"><option value="">All games</option><option value="yes">Owned only</option><option value="no">Not owned — to review</option></select>
         </div>
       </div>
-      <div class="legend" id="ownlegend"><span><span class="rib rib3"></span><span class="rib rib2"></span><span class="rib rib1"></span> quality: 90+ / 85+ / 78+</span><span><i></i>gray row = not owned</span><span><span class="avail" style="margin:0">also on Steam</span> = owned on 2 stores, counted once</span></div>
+      <div class="legend" id="ownlegend"><span>dots (Metacritic · SteamDB): <span class="dot d-violet" style="display:inline-block;vertical-align:middle"></span> 90+ · <span class="dot d-green" style="display:inline-block;vertical-align:middle"></span> 85+ · <span class="dot d-sage" style="display:inline-block;vertical-align:middle"></span> 78+ · <span class="dot d-gray" style="display:inline-block;vertical-align:middle"></span> &lt;78 · <span class="dot none" style="display:inline-block;vertical-align:middle"></span> none</span><span><i></i>gray row = not owned</span><span><span class="avail" style="margin:0">also on Steam</span> = owned on 2 stores, counted once</span></div>
       <div class="chips" id="chips"></div>
       <div id="serieschart" class="hide"></div>
       <div class="tablewrap">
@@ -357,11 +360,12 @@ function stripEdition(name){
 }
 const baseDisplay=name=>stripEdition(name);
 const baseKey=name=>norm(stripEdition(name));
-function computeAvg(g){const v=[g.Critic,g.SteamDB].filter(x=>x!=='');return v.length?Math.round((v.reduce((a,b)=>a+b,0)/v.length)*2)/2:'';}
+function computeAvg(g){return (g.Critic!==''&&g.SteamDB!=='')?Math.round(((g.Critic+g.SteamDB)/2)*2)/2:'';}
 function tierFromAvg(a){if(a===''||a===undefined)return'';if(a>=90)return'top';if(a>=85)return'good';if(a>=78)return'ok';return'low';}
-function computeTier(g){if(g.Avg!=='')return tierFromAvg(g.Avg);const m=g.Mark;return m==='***'?'top':m==='**'?'good':m==='*'?'ok':'';}
+function computeMark(g){const n=(g.Critic!==''&&g.Critic>=80?1:0)+(g.SteamDB!==''&&g.SteamDB>=80?1:0);return n===2?'**':n===1?'*':'';}
+function computeTier(g){return tierFromAvg(g.Avg);}
 function inferSeries(name){const n=String(name).toLowerCase().replace(/[’‘`]/g,"'").replace(/_/g,' ');for(const [re,s] of SERIES_RULES){if(re.test(n))return s;}return'';}
-function finalize(g,headerSeries){g.Avg=computeAvg(g);g.Tier=computeTier(g);if(!g.Series)g.Series=inferSeries(g.Name)||(headerSeries||'');return g;}
+function finalize(g,headerSeries){g.Avg=computeAvg(g);g.Mark=computeMark(g);g.Tier=computeTier(g);if(!g.Series)g.Series=inferSeries(g.Name)||(headerSeries||'');return g;}
 
 /* ============ parsing (app's own exported "Games" sheet) ============ */
 function parseClean(aoa){
@@ -552,14 +556,16 @@ function renderTable(){
   }else{more.classList.add('hide');more.innerHTML='';}
 }
 function rowHTML(g){
-  const tcls=g.Tier?(' t-'+g.Tier):'';
-  const cls=(g.Owned==='Yes'?'':' unowned')+tcls;
-  return `<tr data-id="${g._id}"${cls.trim()?` class="${cls.trim()}"`:''}>`+COLS.map(c=>{
+  const dotCls=v=>{if(v==='')return 'dot none';const t=tierFromAvg(v);return 'dot '+(t==='top'?'d-violet':t==='good'?'d-green':t==='ok'?'d-sage':'d-gray');};
+  const dots=`<span class="dots"><span class="${dotCls(g.Critic)}" title="Metacritic${g.Critic!==''?' '+g.Critic:' — no review'}"></span><span class="${dotCls(g.SteamDB)}" title="SteamDB${g.SteamDB!==''?' '+g.SteamDB:' — no review'}"></span></span>`;
+  const cls=(g.Owned==='Yes'?'':'unowned');
+  return `<tr data-id="${g._id}"${cls?` class="${cls}"`:''}>`+COLS.map(c=>{
     const v=g[c.k];
     if(c.k==='Avg'){const t=tierFromAvg(v);const cl=t==='top'?'av-top':t==='good'?'av-good':t==='ok'?'av-ok':t==='low'?'av-low':'';const inner=v===''?'<span style="color:var(--faint)">·</span>':`<span class="${cl}">${v}</span>`;return `<td class="num">${inner}</td>`;}
+    if(c.k==='HLTB'){const disp=(v==='')?'<span style="color:var(--faint)">·</span>':(Math.round(v*1.5*2)/2);return `<td class="num">${disp}</td>`;}
     if(c.k==='Series')return `<td class="series">${esc(v||'')}</td>`;
     if(c.k==='Store')return `<td class="series">${esc(v)}</td>`;
-    if(c.name){const tag=g.AvailOn?`<span class="avail">also on ${esc(g.AvailOn)}</span>`:'';return `<td class="name sticky-name">${esc(v)}${tag}<span class="edit">edit</span></td>`;}
+    if(c.name){const tag=g.AvailOn?`<span class="avail">also on ${esc(g.AvailOn)}</span>`:'';return `<td class="name sticky-name">${dots}${esc(v)}${tag}<span class="edit">edit</span></td>`;}
     if(c.num){let disp;if(v==='')disp='<span style="color:var(--faint)">·</span>';else if(c.year)disp=String(v);else disp=(typeof v==='number'&&v>=1000?v.toLocaleString():v);return `<td class="num">${disp}</td>`;}
     return `<td>${esc(v||'')}</td>`;
   }).join('')+'</tr>';
@@ -620,7 +626,6 @@ function saveModal(){
   if(!data.Name){alert('Give the game a title.');return;}
   if(!editingId){const dup=MODEL.games.find(x=>norm(x.Name)===norm(data.Name)&&x.Store===data.Store);if(dup&&!confirm('“'+data.Name+'” already exists in '+data.Store+'. Add it again anyway?'))return;}
   const existing=editingId?MODEL.games.find(x=>x._id===editingId):null;
-  data.Mark=existing?(existing.Mark||''):'';
   if(!data.Owned && (data.AvailOn||data.PricePaid!==''||data.Added!==''))data.Owned='Yes';
   finalize(data);
   if(existing){Object.assign(existing,data);}else{data._id=UID++;MODEL.games.push(data);}
@@ -645,8 +650,12 @@ function buildWorkbook(){
   const bn=v=>(v===''||v===undefined)?null:v;
   const data=[HEADERS, ...MODEL.games.map(g=>HEADERS.map(h=>bn(g[H2F[h]])))];
   const gws=XLSX.utils.aoa_to_sheet(data);
-  // Avg (col G) as a live formula = rounded average of Critic (E) and SteamDB (F)
-  MODEL.games.forEach((g,i)=>{ if(g.Avg!==''){ const r=i+1; const cell=XLSX.utils.encode_cell({r,c:6}); const E=XLSX.utils.encode_cell({r,c:4}), F=XLSX.utils.encode_cell({r,c:5}); gws[cell]={t:'n',f:`IF(COUNT(${E},${F})=0,"",ROUND(AVERAGE(${E},${F})*2,0)/2)`,v:g.Avg}; } });
+  // Avg (col G) = rounded average, ONLY when BOTH Critic (E) and SteamDB (F) are present.
+  // Star/Mark (col P) = one * per score above 80 (formula-based).
+  MODEL.games.forEach((g,i)=>{ const r=i+1; const E=XLSX.utils.encode_cell({r,c:4}), F=XLSX.utils.encode_cell({r,c:5});
+    if(g.Avg!==''){ gws[XLSX.utils.encode_cell({r,c:6})]={t:'n',f:`IF(COUNT(${E},${F})<2,"",ROUND(AVERAGE(${E},${F})*2,0)/2)`,v:g.Avg}; }
+    if(g.Mark!==''){ gws[XLSX.utils.encode_cell({r,c:15})]={t:'s',f:`REPT("*",IF(${E}>=80,1,0)+IF(${F}>=80,1,0))`,v:g.Mark}; }
+  });
   XLSX.utils.book_append_sheet(wb, gws, 'Games');
   if((MODEL.wishlist||[]).length){const wd=[['Released','Game','Critic','Steam','HLTB','HLTB Full','Notes','Bought?'],...MODEL.wishlist.map(w=>[bn(w.Year),bn(w.Game),bn(w.Critic),bn(w.Steam),bn(w.HLTB),bn(w.HLTBFull),bn(w.Note),w.Bought?'Yes':null])];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(wd),(MODEL.wishSheet||'Wishlists').slice(0,31));}
   if((MODEL.ratings||[]).length){const rd=[['Game','Rating'],...MODEL.ratings.map(x=>[x.Game,bn(x.Rating)])];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rd),(MODEL.rateSheet||'Played Games').slice(0,31));}
