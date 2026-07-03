@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fflate/0.8.2/umd/index.min.js"></script>
 <style>
   :root{
     --ink:#101218; --panel:#1b1e29; --raised:#252a3a; --line:#343a4e;
@@ -159,11 +160,22 @@
   .checkrow input{width:18px;height:18px;accent-color:var(--mint);flex:none}
   .showhide{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);cursor:pointer;white-space:nowrap}
   .showhide input{width:16px;height:16px;accent-color:var(--mint)}
+  .controls .selbtn{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:9px 11px;font-family:"Hanken Grotesk",sans-serif;font-size:13.5px;outline:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .controls .selbtn:focus,.controls .selbtn.open{border-color:var(--mint)}
+  .controls .selbtn .caret{width:15px;height:15px;stroke:var(--muted);fill:none;stroke-width:2}
+  .ownmenu .menu-pop{left:0;right:auto;min-width:220px}
+  .ownmenu .menu-pop button[aria-selected="true"]{color:var(--mint);font-weight:600}
+  .menu-sep{height:1px;background:var(--line);margin:6px 4px}
+  .menu-check{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;font-size:13.5px;color:var(--text);cursor:pointer}
+  .menu-check:hover{background:var(--raised)}
+  .menu-check input{width:17px;height:17px;accent-color:var(--mint);flex:none}
   .hidtag{display:inline-block;margin-left:8px;padding:0 6px;border:1px solid var(--line);border-radius:6px;font-size:10px;color:var(--muted);vertical-align:middle;text-transform:uppercase;letter-spacing:.04em}
   tbody tr.ishidden td{opacity:.55}
   tbody tr.ishidden td.sticky-name{opacity:1}
   tbody tr.ishidden td.sticky-name .avail,tbody tr.ishidden td.sticky-name .edit{opacity:1}
+  th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
   .avail{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:1px 5px;margin-left:7px;vertical-align:middle}
+  .edtag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10px;color:#c3b6ff;border:1px solid #4a4470;background:rgba(124,106,214,.14);border-radius:5px;padding:1px 6px;margin-left:7px;vertical-align:middle;white-space:nowrap}
   .legend{display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);margin:2px 0 9px}
   .legend i{display:inline-block;width:16px;height:11px;border-radius:3px;vertical-align:middle;margin-right:5px;background:#262a35}
   .av-top{color:var(--q1);font-weight:700} .av-good{color:var(--q2);font-weight:700} .av-ok{color:var(--q3);font-weight:600} .av-low{color:var(--text)}
@@ -277,8 +289,16 @@
           <input type="search" id="q" placeholder="Search name or series…">
           <select id="store"></select>
           <select id="series"></select>
-          <select id="own"><option value="">All games</option><option value="yes">Owned only</option><option value="no">Not owned — to review</option></select>
-          <label class="showhide"><input type="checkbox" id="showhidden"> show hidden</label>
+          <div class="menu ownmenu">
+            <button type="button" class="selbtn" id="ownBtn" aria-haspopup="true"><span id="ownLbl">All games</span><svg class="caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="menu-pop hide" id="ownMenu">
+              <button type="button" data-own="" aria-selected="true">All games</button>
+              <button type="button" data-own="yes" aria-selected="false">Owned only</button>
+              <button type="button" data-own="no" aria-selected="false">Not owned — to review</button>
+              <div class="menu-sep"></div>
+              <label class="menu-check"><input type="checkbox" id="showhidden"> Show hidden games</label>
+            </div>
+          </div>
         </div>
       </div>
       <div class="legend" id="ownlegend"><span>dots (Metacritic · SteamDB): <span class="dot d-violet" style="display:inline-block;vertical-align:middle"></span> 90+ · <span class="dot d-green" style="display:inline-block;vertical-align:middle"></span> 85+ · <span class="dot d-sage" style="display:inline-block;vertical-align:middle"></span> 78+ · <span class="dot d-gray" style="display:inline-block;vertical-align:middle"></span> &lt;78 · <span class="dot none" style="display:inline-block;vertical-align:middle"></span> none</span><span><i></i>gray row = not owned</span><span><span class="avail" style="margin:0">also on Steam</span> = owned on 2 stores, counted once</span></div>
@@ -351,14 +371,46 @@ const SERIES_RULES=[
  [/\bmy time at\b/i,'My Time At'],[/\bhow to survive\b/i,'How to Survive'],[/\bspider-?man\b/i,"Marvel's Spider-Man"],[/\btiny tina/i,'Borderlands'],
  [/\bdesperados\b/i,'Desperados'],[/\btrials (rising|fusion|evolution)\b/i,'Trials'],
 ];
-const HEADERS=['Name','Store','Series','Release Year','Critic','SteamDB','Avg','My Rating','HLTB','HLTB Full','Price Paid','Normal Price','Added','Owned','Available On','Mark','Hidden'];
-const H2F={'Name':'Name','Store':'Store','Series':'Series','Release Year':'ReleaseYear','Critic':'Critic','SteamDB':'SteamDB','Avg':'Avg','My Rating':'MyRating','HLTB':'HLTB','HLTB Full':'HLTBFull','Price Paid':'PricePaid','Normal Price':'NormalPrice','Added':'Added','Owned':'Owned','Available On':'AvailOn','Mark':'Mark','Hidden':'Hidden'};
+const HEADERS=['Name','Store','Series','Release Year','Critic','SteamDB','Avg','My Rating','HLTB','HLTB Full','Price Paid','Normal Price','Added','Owned','Available On','Mark','Hidden','Edition'];
+const H2F={'Name':'Name','Store':'Store','Series':'Series','Release Year':'ReleaseYear','Critic':'Critic','SteamDB':'SteamDB','Avg':'Avg','My Rating':'MyRating','HLTB':'HLTB','HLTB Full':'HLTBFull','Price Paid':'PricePaid','Normal Price':'NormalPrice','Added':'Added','Owned':'Owned','Available On':'AvailOn','Mark':'Mark','Hidden':'Hidden','Edition':'Edition'};
 
 /* ============ helpers ============ */
 const isBlank=v=>v===null||v===undefined||(typeof v==='string'&&v.trim()==='');
 function num(v){if(v===null||v===undefined)return'';if(typeof v==='number')return Number.isInteger(v)?v:Math.round(v*100)/100;if(typeof v==='string'){const t=v.trim();if(t===''||t.toLowerCase()==='nan')return'';const f=parseFloat(t);return isNaN(f)?'':(Number.isInteger(f)?f:Math.round(f*100)/100);}return'';}
 const norm=s=>String(s).toLowerCase().replace(/[^a-z0-9]/g,'');
 const EDITION_RE=/^(ultimate|premium|deluxe|gold|standard|definitive|complete|legendary|anniversary|remastered|remaster|goty|collection|bundle|celebration|enhanced|special|digital|founders?|edition|expansions?|expansion|hd|reloaded)$/;
+/* ---- edition extraction: split a trailing edition/DLC tag off a title ----
+   editions ≠ versions: (2019)/(Classic)/sequel numbers stay in the title. */
+const ED_CORE=new Set(['edition','goty','redux','remastered','remaster','definitive','deluxe','ultimate','premium','premier','gold','platinum','legendary','enhanced','celebration','warmastered','deathinitive','complete','expansions','expansion','bundle','package','romastered']);
+const ED_MOD=new Set(['super','digital','full','extended','sovereign','encore','enchanted','championship','turbo','history','cadet','rad','jotuun','xxl','plus','clip','choice',"spacer's","collector's",'collectors','anniversary','the']);
+const ED_NEVER=new Set(['ultimate chicken horse','tomb raider: anniversary','soundodger+']);
+function isEdPhrase(s){const w=String(s).toLowerCase().split(/\s+/).filter(Boolean);return w.some(t=>ED_CORE.has(t.replace(/[()]/g,'').replace(/:$/,'')));}
+function edPeelOnce(n){
+  n=n.replace(/\s+$/,'');
+  let m=n.match(/^(.*\S)\s+(\+.*)$/);                       // " + DLC/Expansions/…"
+  if(m&&m[1].trim())return [m[1].replace(/[\s:–—-]+$/,''), m[2].trim()];
+  m=n.match(/^(.*\S)\s*\(([^()]+)\)\s*$/);                  // trailing (Edition) — not a year/Classic
+  if(m){const inner=m[2].trim(),il=inner.toLowerCase();
+    if(!/^\d{4}$/.test(inner)&&il!=='classic'&&il!=='subscription'&&isEdPhrase(inner))return [m[1].replace(/[\s:–—-]+$/,''), inner];}
+  const toks=n.split(/\s+/); const tail=[];
+  while(toks.length>1){const raw=toks[toks.length-1]; const low=raw.replace(/[()]/g,'').replace(/:$/,'').toLowerCase();
+    if(/:$/.test(raw))break;                                // attached colon = end of title
+    if(ED_CORE.has(low)){tail.unshift(toks.pop());continue;}
+    if((ED_MOD.has(low)||/^\d+(y|yr|yrs|th|nd|st|rd)$/.test(low))&&tail.length){tail.unshift(toks.pop());continue;}
+    break;}
+  if(tail.length){
+    if(tail.length===1&&tail[0].replace(/[()]/g,'').replace(/:$/,'').toLowerCase()==='edition')return null;
+    const base=toks.join(' ').replace(/[\s:–—-]+$/,'');
+    if(base.length>=2)return [base, tail.join(' ')];}
+  return null;
+}
+function deriveEdition(raw){
+  let n=String(raw).replace(/[’`]/g,"'").trim();
+  if(ED_NEVER.has(n.toLowerCase()))return [n,''];
+  const parts=[];
+  while(true){const r=edPeelOnce(n);if(!r)break;n=r[0];parts.unshift(r[1]);if(n.length<2)break;}
+  return [n.replace(/[\s:–—-]+$/,'').trim(), parts.join(' ').trim()];
+}
 function stripEdition(name){
   let s=String(name).replace(/[’`]/g,"'").trim();
   s=s.replace(/\s*[\(\[][^)\]]*[\)\]]\s*$/,'');           // trailing (...) or [...]
@@ -375,7 +427,10 @@ function tierFromAvg(a){if(a===''||a===undefined)return'';if(a>=90)return'top';i
 function computeMark(g){const n=(g.Critic!==''&&g.Critic>=80?1:0)+(g.SteamDB!==''&&g.SteamDB>=80?1:0);return n===2?'**':n===1?'*':'';}
 function computeTier(g){return tierFromAvg(g.Avg);}
 function inferSeries(name){const n=String(name).toLowerCase().replace(/[’‘`]/g,"'").replace(/_/g,' ');for(const [re,s] of SERIES_RULES){if(re.test(n))return s;}return'';}
-function finalize(g,headerSeries){g.Owned=(g.Store||g.AvailOn||g.PricePaid!==''||g.Added!=='')?'Yes':'';if(g.Owned!=='Yes'){g.Store='';g.AvailOn='';}g.Avg=computeAvg(g);g.Mark=computeMark(g);g.Tier=computeTier(g);if(!g.Series)g.Series=inferSeries(g.Name)||(headerSeries||'');return g;}
+function finalize(g,headerSeries){
+  if(g.Edition===undefined)g.Edition='';
+  if(g.Edition===''&&g.Name){const[base,ed]=deriveEdition(g.Name);if(ed){g.Name=base;g.Edition=ed;}}
+  g.Owned=(g.Store||g.AvailOn||g.PricePaid!==''||g.Added!=='')?'Yes':'';if(g.Owned!=='Yes'){g.Store='';g.AvailOn='';}g.Avg=computeAvg(g);g.Mark=computeMark(g);g.Tier=computeTier(g);if(!g.Series)g.Series=inferSeries(g.Name)||(headerSeries||'');return g;}
 
 /* ============ parsing (app's own exported "Games" sheet) ============ */
 function parseClean(aoa){
@@ -385,7 +440,7 @@ function parseClean(aoa){
     const row=aoa[r]; if(!row||row.every(isBlank))continue;
     const g={};
     for(const h of HEADERS){const f=H2F[h];const v=(idx[h]===undefined?null:row[idx[h]]);
-      g[f]=(h==='Owned'||h==='Hidden')?((String(v).toLowerCase()==='yes'||v===true)?'Yes':''):(['Name','Store','Series','Mark','AvailOn'].includes(f)?(v==null?'':String(v).trim()):num(v));}
+      g[f]=(h==='Owned'||h==='Hidden')?((String(v).toLowerCase()==='yes'||v===true)?'Yes':''):(['Name','Store','Series','Mark','AvailOn','Edition'].includes(f)?(v==null?'':String(v).trim()):num(v));}
     if(!g.Name)continue; games.push(finalize(g));
   }
   return games;
@@ -396,6 +451,8 @@ function aoaOf(wb,name){return wb.Sheets[name]?XLSX.utils.sheet_to_json(wb.Sheet
 let MODEL={games:[],passthrough:{},wishlist:[],ratings:[]}; let UID=1; let DIRTY=0;
 const FILTER={q:'',store:'',series:'',own:'',year:'',tier:'',showHidden:false};
 let sortStack=[{k:'Avg',dir:-1}];
+let rateSort={k:'Rating',dir:-1};
+function yearKey(y){if(y===''||y==null)return null;const s=String(y);if(/^\s*</.test(s)){const m=s.match(/\d{4}/);return m?+m[0]-0.5:null;}const m=s.match(/\d{4}/);return m?+m[0]:null;}
 const PAGE=100; let page=1, lastSig='';
 
 document.getElementById('file').addEventListener('change',async e=>{
@@ -489,15 +546,20 @@ function buildFilters(){
   document.getElementById('store').innerHTML='<option value="">All stores</option>'+stores.map(s=>`<option>${esc(s)}</option>`).join('');
   const ser=[...new Set(MODEL.games.map(x=>x.Series).filter(Boolean))].sort();
   document.getElementById('series').innerHTML='<option value="">All series</option>'+ser.map(s=>`<option>${esc(s)}</option>`).join('');
-  ['q','store','series','own'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{
+  ['q','store','series'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{
     FILTER.q=document.getElementById('q').value.trim().toLowerCase();
     FILTER.store=document.getElementById('store').value; FILTER.series=document.getElementById('series').value;
-    FILTER.own=document.getElementById('own').value; renderTable(); renderControls();
+    renderTable(); renderControls();
   }));
-  const sh=document.getElementById('showhidden'); if(sh)sh.addEventListener('change',e=>{FILTER.showHidden=e.target.checked;renderTable();});
+}
+function updateOwnUI(){
+  const lab={'':'All games','yes':'Owned only','no':'Not owned'}[FILTER.own]||'All games';
+  const l=document.getElementById('ownLbl'); if(l)l.textContent=lab;
+  document.querySelectorAll('#ownMenu button[data-own]').forEach(b=>b.setAttribute('aria-selected',b.dataset.own===FILTER.own?'true':'false'));
+  const sh=document.getElementById('showhidden'); if(sh)sh.checked=FILTER.showHidden;
 }
 function renderControls(){
-  document.getElementById('store').value=FILTER.store; document.getElementById('series').value=FILTER.series; document.getElementById('own').value=FILTER.own;
+  document.getElementById('store').value=FILTER.store; document.getElementById('series').value=FILTER.series; updateOwnUI();
   const lbl={store:'Store',series:'Series',own:'Show',year:'Bought',tier:'Tier',q:'Search'};
   const chips=[];
   for(const k of ['q','store','series','own','year','tier']){ if(!FILTER[k])continue;
@@ -586,7 +648,7 @@ function rowHTML(g){
     if(c.k==='HLTB'){const disp=(v==='')?'<span style="color:var(--faint)">·</span>':Math.round(v*1.5);return `<td class="num">${disp}</td>`;}
     if(c.k==='Series')return `<td class="series">${esc(v||'')}</td>`;
     if(c.k==='Store')return `<td class="series">${esc(v)}</td>`;
-    if(c.name){const tag=g.AvailOn?`<span class="avail">also on ${esc(g.AvailOn)}</span>`:'';const hid=g.Hidden==='Yes'?`<span class="hidtag">hidden</span>`:'';return `<td class="name sticky-name">${dots}${esc(v)}${hid}${tag}<span class="edit">edit</span></td>`;}
+    if(c.name){const tag=g.AvailOn?`<span class="avail">also on ${esc(g.AvailOn)}</span>`:'';const edt=g.Edition?`<span class="edtag">${esc(g.Edition)}</span>`:'';const hid=g.Hidden==='Yes'?`<span class="hidtag">hidden</span>`:'';return `<td class="name sticky-name">${dots}${esc(v)}${edt}${hid}${tag}<span class="edit">edit</span></td>`;}
     if(c.num){let disp;if(v==='')disp='<span style="color:var(--faint)">·</span>';else if(c.year)disp=String(v);else disp=(typeof v==='number'&&v>=1000?v.toLocaleString():v);return `<td class="num">${disp}</td>`;}
     return `<td>${esc(v||'')}</td>`;
   }).join('')+'</tr>';
@@ -595,7 +657,7 @@ document.getElementById('tbody').addEventListener('click',e=>{const tr=e.target.
 
 /* ============ modal ============ */
 const FIELDS=[
-  ['Name','Title','text',true],['Store','Store','store'],['Series','Series','series'],
+  ['Name','Title','text',true],['Edition','Edition (e.g. Ultimate, + Expansions)','text',true],['Store','Store','store'],['Series','Series','series'],
   ['ReleaseYear','Released (year)','num'],['Critic','Critic score','num'],['SteamDB','SteamDB score','num'],
   ['MyRating','My rating','num'],['HLTB','HLTB hours','num'],['HLTBFull','HLTB full','num'],
   ['PricePaid','Price paid','num'],['NormalPrice','Normal price','num'],['Added','Bought (year)','num'],
@@ -604,7 +666,7 @@ const FIELDS=[
 let editingId=null;
 function openEdit(id){
   editingId=id;
-  const g=id?MODEL.games.find(x=>x._id===id):{Name:'',Store:'Steam',Series:'',ReleaseYear:'',Critic:'',SteamDB:'',MyRating:'',HLTB:'',HLTBFull:'',PricePaid:'',NormalPrice:'',Added:'',AvailOn:'',Mark:'',Owned:''};
+  const g=id?MODEL.games.find(x=>x._id===id):{Name:'',Edition:'',Store:'Steam',Series:'',ReleaseYear:'',Critic:'',SteamDB:'',MyRating:'',HLTB:'',HLTBFull:'',PricePaid:'',NormalPrice:'',Added:'',AvailOn:'',Mark:'',Owned:''};
   const serOpts=[...new Set(MODEL.games.map(x=>x.Series).filter(Boolean))].sort();
   const storeOpts=[...new Set(MODEL.games.map(x=>x.Store).filter(Boolean))].sort();
   const fhtml=FIELDS.map(([k,lab,type,full])=>{
@@ -688,15 +750,32 @@ function download(fmt){
   try{
     const wb=buildWorkbook();
     if(fmt==='csv'){saveBlob(new Blob([XLSX.utils.sheet_to_csv(wb.Sheets['Games'])],{type:'text/csv'}),stamp()+'.csv');}
-    else{const out=XLSX.write(wb,{bookType:fmt,type:'array',compression:true});saveBlob(new Blob([out],{type:'application/octet-stream'}),stamp()+'.'+fmt);}
+    else{let out=XLSX.write(wb,{bookType:fmt,type:'array',compression:true});
+      if(fmt==='ods')out=compressOds(out);
+      saveBlob(new Blob([out],{type:'application/octet-stream'}),stamp()+'.'+fmt);}
     DIRTY=0; updateUnsaved();
   }catch(err){alert('Download failed: '+err.message+'\nTry the .xlsx option.');}
 }
 function saveBlob(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),2000);}
+/* SheetJS writes ODS uncompressed (issue #1201). Re-zip with DEFLATE; keep mimetype stored + first. */
+function compressOds(out){
+  try{
+    if(typeof fflate==='undefined'||!fflate.unzipSync)return out;
+    const files=fflate.unzipSync(new Uint8Array(out));
+    const input={};
+    if(files['mimetype'])input['mimetype']=[files['mimetype'],{level:0}];
+    for(const name in files){if(name==='mimetype')continue;input[name]=[files[name],{level:6}];}
+    return fflate.zipSync(input,{});
+  }catch(e){return out;}
+}
 const dlMenu=document.getElementById('dlMenu');
-document.getElementById('dlBtn').addEventListener('click',e=>{e.stopPropagation();dlMenu.classList.toggle('hide');});
-document.addEventListener('click',e=>{if(!e.target.closest('.menu'))dlMenu.classList.add('hide');});
+const ownMenu=document.getElementById('ownMenu'), ownBtn=document.getElementById('ownBtn');
+document.getElementById('dlBtn').addEventListener('click',e=>{e.stopPropagation();ownMenu.classList.add('hide');ownBtn.classList.remove('open');dlMenu.classList.toggle('hide');});
+ownBtn.addEventListener('click',e=>{e.stopPropagation();dlMenu.classList.add('hide');ownMenu.classList.toggle('hide');ownBtn.classList.toggle('open',!ownMenu.classList.contains('hide'));});
+document.addEventListener('click',e=>{if(!e.target.closest('.menu')){dlMenu.classList.add('hide');ownMenu.classList.add('hide');ownBtn.classList.remove('open');}});
 dlMenu.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{dlMenu.classList.add('hide');download(b.dataset.fmt);}));
+ownMenu.querySelectorAll('button[data-own]').forEach(b=>b.addEventListener('click',()=>{FILTER.own=b.dataset.own;ownMenu.classList.add('hide');ownBtn.classList.remove('open');updateOwnUI();renderTable();renderControls();}));
+document.getElementById('showhidden').addEventListener('change',e=>{FILTER.showHidden=e.target.checked;renderTable();});
 
 /* ============ series chart ============ */
 function renderSeriesChart(rows){
@@ -798,9 +877,19 @@ function renderRatings(){
   const q=(document.getElementById('rq').value||'').trim().toLowerCase();
   const list=MODEL.ratings||[];
   const rows=list.filter(x=>!q||x.Game.toLowerCase().includes(q)||(x.Note||'').toLowerCase().includes(q));
+  const {k,dir}=rateSort;
+  rows.sort((a,b)=>{
+    if(k==='Game')return cmp(a.Game,b.Game)*dir||b.Rating-a.Rating;
+    if(k==='Year'){const ay=yearKey(a.Year),by=yearKey(b.Year);
+      if(ay===null&&by===null)return b.Rating-a.Rating;
+      if(ay===null)return 1; if(by===null)return -1;
+      return (ay-by)*dir||b.Rating-a.Rating;}
+    return (a.Rating-b.Rating)*dir||cmp(a.Game,b.Game);
+  });
   document.getElementById('ct-rate').textContent=list.length;
   document.getElementById('rate-count').textContent=rows.length+' shown';
-  document.getElementById('rthead').innerHTML=['Game','My rating','Year','Notes'].map((h,i)=>`<th class="${i===1?'r':''} ${i===0?'sticky-name':''}">${h}</th>`).join('');
+  const arrow=key=>rateSort.k===key?(rateSort.dir<0?' ▾':' ▴'):'';
+  document.getElementById('rthead').innerHTML=[['Game','Game'],['My rating','Rating'],['Year','Year'],['Notes',null]].map(([h,key],i)=>`<th class="${i===1?'r ':''}${i===0?'sticky-name ':''}${key?'sortable':''}"${key?` data-rk="${key}"`:''}>${h}${key?arrow(key):''}</th>`).join('');
   document.getElementById('rbody').innerHTML=rows.map(x=>{const cl=x.Rating>=8?'av-top':x.Rating>=6.5?'av-good':'av-ok';const yr=x.Year?esc(x.Year):'<span style="color:var(--faint)">·</span>';return `<tr data-rid="${x._id}"><td class="name sticky-name">${esc(x.Game)}<span class="edit">edit</span></td><td class="num"><span class="${cl}">${x.Rating}</span><span style="color:var(--faint)">/10</span></td><td class="num">${yr}</td><td class="series">${esc(x.Note||'')}</td></tr>`;}).join('')||emptyRow(4);
 }
 /* generic mini editor for a row object */
@@ -835,6 +924,7 @@ document.getElementById('wadd').addEventListener('click',()=>openMini('Add wishl
 document.getElementById('radd').addEventListener('click',()=>openMini('Add rating',RATE_FIELDS,null,r=>{MODEL.ratings.push({_id:UID++,key:baseKey(r.Game),Game:baseDisplay(r.Game),Rating:r.Rating,Year:r.Year,Note:r.Note});MODEL.ratings.sort((a,b)=>b.Rating-a.Rating);syncRatingsToGames();renderRatings();renderTable();}));
 document.getElementById('wq').addEventListener('input',renderWishlist);
 document.getElementById('rq').addEventListener('input',renderRatings);
+document.getElementById('rthead').addEventListener('click',e=>{const th=e.target.closest('[data-rk]');if(!th)return;const k=th.dataset.rk;if(rateSort.k===k)rateSort.dir*=-1;else rateSort={k,dir:k==='Game'?1:-1};renderRatings();});
 document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(!b)return;const t=b.dataset.tab;document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));['library','wishlist','ratings'].forEach(p=>document.getElementById('tab-'+p).classList.toggle('hide',p!==t));});
 
 /* ============ util ============ */
