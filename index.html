@@ -155,6 +155,14 @@
   .dot.d-sage{background:var(--q3);border:1.5px solid var(--dot-ring)}
   .dot.d-gray{background:var(--dot-gray);border:1.5px solid var(--dot-ring)}
   .dot.none{background:transparent;border:1.5px solid var(--dot-ring)}
+  .checkrow{display:flex;align-items:center;gap:9px;cursor:pointer}
+  .checkrow input{width:18px;height:18px;accent-color:var(--mint);flex:none}
+  .showhide{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);cursor:pointer;white-space:nowrap}
+  .showhide input{width:16px;height:16px;accent-color:var(--mint)}
+  .hidtag{display:inline-block;margin-left:8px;padding:0 6px;border:1px solid var(--line);border-radius:6px;font-size:10px;color:var(--muted);vertical-align:middle;text-transform:uppercase;letter-spacing:.04em}
+  tbody tr.ishidden td{opacity:.55}
+  tbody tr.ishidden td.sticky-name{opacity:1}
+  tbody tr.ishidden td.sticky-name .avail,tbody tr.ishidden td.sticky-name .edit{opacity:1}
   .avail{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:1px 5px;margin-left:7px;vertical-align:middle}
   .legend{display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);margin:2px 0 9px}
   .legend i{display:inline-block;width:16px;height:11px;border-radius:3px;vertical-align:middle;margin-right:5px;background:#262a35}
@@ -169,7 +177,10 @@
   #serieschart .leg{display:flex;gap:16px;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);margin:4px 0 8px}
   #serieschart .leg span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
   #serieschart .leg .c1::before{background:var(--mint)} #serieschart .leg .c2::before{background:var(--violet)} #serieschart .leg .c3::before{background:var(--amber)}
-  #serieschart svg{width:100%;height:auto;display:block}
+  #serieschart .chartscroll{overflow-x:auto;overflow-y:hidden;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+  #serieschart .chartscroll svg{display:block}
+  #serieschart .xlab{cursor:default}
+  #serieschart .charthint{color:var(--faint);font-size:11px;margin:6px 0 0}
 
   .scrim{position:fixed;inset:0;background:rgba(8,9,13,.66);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:18px;z-index:50}
   .modal{width:min(540px,100%);max-height:92vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.5)}
@@ -267,6 +278,7 @@
           <select id="store"></select>
           <select id="series"></select>
           <select id="own"><option value="">All games</option><option value="yes">Owned only</option><option value="no">Not owned — to review</option></select>
+          <label class="showhide"><input type="checkbox" id="showhidden"> show hidden</label>
         </div>
       </div>
       <div class="legend" id="ownlegend"><span>dots (Metacritic · SteamDB): <span class="dot d-violet" style="display:inline-block;vertical-align:middle"></span> 90+ · <span class="dot d-green" style="display:inline-block;vertical-align:middle"></span> 85+ · <span class="dot d-sage" style="display:inline-block;vertical-align:middle"></span> 78+ · <span class="dot d-gray" style="display:inline-block;vertical-align:middle"></span> &lt;78 · <span class="dot none" style="display:inline-block;vertical-align:middle"></span> none</span><span><i></i>gray row = not owned</span><span><span class="avail" style="margin:0">also on Steam</span> = owned on 2 stores, counted once</span></div>
@@ -339,8 +351,8 @@ const SERIES_RULES=[
  [/\bmy time at\b/i,'My Time At'],[/\bhow to survive\b/i,'How to Survive'],[/\bspider-?man\b/i,"Marvel's Spider-Man"],[/\btiny tina/i,'Borderlands'],
  [/\bdesperados\b/i,'Desperados'],[/\btrials (rising|fusion|evolution)\b/i,'Trials'],
 ];
-const HEADERS=['Name','Store','Series','Release Year','Critic','SteamDB','Avg','My Rating','HLTB','HLTB Full','Price Paid','Normal Price','Added','Owned','Available On','Mark'];
-const H2F={'Name':'Name','Store':'Store','Series':'Series','Release Year':'ReleaseYear','Critic':'Critic','SteamDB':'SteamDB','Avg':'Avg','My Rating':'MyRating','HLTB':'HLTB','HLTB Full':'HLTBFull','Price Paid':'PricePaid','Normal Price':'NormalPrice','Added':'Added','Owned':'Owned','Available On':'AvailOn','Mark':'Mark'};
+const HEADERS=['Name','Store','Series','Release Year','Critic','SteamDB','Avg','My Rating','HLTB','HLTB Full','Price Paid','Normal Price','Added','Owned','Available On','Mark','Hidden'];
+const H2F={'Name':'Name','Store':'Store','Series':'Series','Release Year':'ReleaseYear','Critic':'Critic','SteamDB':'SteamDB','Avg':'Avg','My Rating':'MyRating','HLTB':'HLTB','HLTB Full':'HLTBFull','Price Paid':'PricePaid','Normal Price':'NormalPrice','Added':'Added','Owned':'Owned','Available On':'AvailOn','Mark':'Mark','Hidden':'Hidden'};
 
 /* ============ helpers ============ */
 const isBlank=v=>v===null||v===undefined||(typeof v==='string'&&v.trim()==='');
@@ -373,7 +385,7 @@ function parseClean(aoa){
     const row=aoa[r]; if(!row||row.every(isBlank))continue;
     const g={};
     for(const h of HEADERS){const f=H2F[h];const v=(idx[h]===undefined?null:row[idx[h]]);
-      g[f]=(h==='Owned')?((String(v).toLowerCase()==='yes'||v===true)?'Yes':''):(['Name','Store','Series','Mark','AvailOn'].includes(f)?(v==null?'':String(v).trim()):num(v));}
+      g[f]=(h==='Owned'||h==='Hidden')?((String(v).toLowerCase()==='yes'||v===true)?'Yes':''):(['Name','Store','Series','Mark','AvailOn'].includes(f)?(v==null?'':String(v).trim()):num(v));}
     if(!g.Name)continue; games.push(finalize(g));
   }
   return games;
@@ -382,7 +394,7 @@ function aoaOf(wb,name){return wb.Sheets[name]?XLSX.utils.sheet_to_json(wb.Sheet
 
 /* ============ state ============ */
 let MODEL={games:[],passthrough:{},wishlist:[],ratings:[]}; let UID=1; let DIRTY=0;
-const FILTER={q:'',store:'',series:'',own:'',year:'',tier:''};
+const FILTER={q:'',store:'',series:'',own:'',year:'',tier:'',showHidden:false};
 let sortStack=[{k:'Avg',dir:-1}];
 const PAGE=100; let page=1, lastSig='';
 
@@ -482,6 +494,7 @@ function buildFilters(){
     FILTER.store=document.getElementById('store').value; FILTER.series=document.getElementById('series').value;
     FILTER.own=document.getElementById('own').value; renderTable(); renderControls();
   }));
+  const sh=document.getElementById('showhidden'); if(sh)sh.addEventListener('change',e=>{FILTER.showHidden=e.target.checked;renderTable();});
 }
 function renderControls(){
   document.getElementById('store').value=FILTER.store; document.getElementById('series').value=FILTER.series; document.getElementById('own').value=FILTER.own;
@@ -518,6 +531,7 @@ document.getElementById('more').addEventListener('click',e=>{
 });
 function currentRows(){
   return MODEL.games.filter(g=>{
+    if(g.Hidden==='Yes' && !FILTER.showHidden)return false;
     if(FILTER.store&&g.Store!==FILTER.store)return false;
     if(FILTER.series&&g.Series!==FILTER.series)return false;
     if(FILTER.own==='yes'&&g.Owned!=='Yes')return false;
@@ -546,7 +560,9 @@ function renderTable(){
   sortStack.forEach((s,i)=>{const ar=document.querySelector(`[data-ar="${s.k}"]`);if(ar){ar.textContent=(s.dir<0?'▾':'▴')+(i>0?String(i+1):'');ar.style.opacity=i===0?'1':'.45';}});
   const paid=rows.reduce((a,x)=>a+(x.PricePaid===''?0:x.PricePaid),0);
   const anyFilter=Object.values(FILTER).some(Boolean);
-  document.getElementById('lib-count').textContent=rows.length+' shown'+(anyFilter&&paid>0?' · paid '+Math.round(paid).toLocaleString():'');
+  const KLBL=Object.fromEntries(COLS.map(c=>[c.k,c.t]));
+  const sortLbl=sortStack.map(s=>(KLBL[s.k]||s.k)+(s.dir<0?'↓':'↑')).join(' › ');
+  document.getElementById('lib-count').textContent=rows.length+' shown'+(anyFilter&&paid>0?' · paid '+Math.round(paid).toLocaleString():'')+' · sort: '+sortLbl;
   const pages=Math.max(1,Math.ceil(rows.length/PAGE));
   if(page>pages)page=pages; if(page<1)page=1;
   const start=(page-1)*PAGE;
@@ -563,14 +579,14 @@ function renderTable(){
 function rowHTML(g){
   const dotCls=v=>{if(v==='')return 'dot none';const t=tierFromAvg(v);return 'dot '+(t==='top'?'d-violet':t==='good'?'d-green':t==='ok'?'d-sage':'d-gray');};
   const dots=`<span class="dots"><span class="${dotCls(g.Critic)}" title="Metacritic${g.Critic!==''?' '+g.Critic:' — no review'}"></span><span class="${dotCls(g.SteamDB)}" title="SteamDB${g.SteamDB!==''?' '+g.SteamDB:' — no review'}"></span></span>`;
-  const cls=(g.Owned==='Yes'?'':'unowned');
+  const cls=[g.Owned==='Yes'?'':'unowned',g.Hidden==='Yes'?'ishidden':''].filter(Boolean).join(' ');
   return `<tr data-id="${g._id}"${cls?` class="${cls}"`:''}>`+COLS.map(c=>{
     const v=g[c.k];
     if(c.k==='Avg'){const t=tierFromAvg(v);const cl=t==='top'?'av-top':t==='good'?'av-good':t==='ok'?'av-ok':t==='low'?'av-low':'';const inner=v===''?'<span style="color:var(--faint)">·</span>':`<span class="${cl}">${v}</span>`;return `<td class="num">${inner}</td>`;}
     if(c.k==='HLTB'){const disp=(v==='')?'<span style="color:var(--faint)">·</span>':Math.round(v*1.5);return `<td class="num">${disp}</td>`;}
     if(c.k==='Series')return `<td class="series">${esc(v||'')}</td>`;
     if(c.k==='Store')return `<td class="series">${esc(v)}</td>`;
-    if(c.name){const tag=g.AvailOn?`<span class="avail">also on ${esc(g.AvailOn)}</span>`:'';return `<td class="name sticky-name">${dots}${esc(v)}${tag}<span class="edit">edit</span></td>`;}
+    if(c.name){const tag=g.AvailOn?`<span class="avail">also on ${esc(g.AvailOn)}</span>`:'';const hid=g.Hidden==='Yes'?`<span class="hidtag">hidden</span>`:'';return `<td class="name sticky-name">${dots}${esc(v)}${hid}${tag}<span class="edit">edit</span></td>`;}
     if(c.num){let disp;if(v==='')disp='<span style="color:var(--faint)">·</span>';else if(c.year)disp=String(v);else disp=(typeof v==='number'&&v>=1000?v.toLocaleString():v);return `<td class="num">${disp}</td>`;}
     return `<td>${esc(v||'')}</td>`;
   }).join('')+'</tr>';
@@ -605,6 +621,7 @@ function openEdit(id){
     <datalist id="storelist">${storeOpts.map(s=>`<option value="${esc(s)}">`).join('')}</datalist>
     <div class="form">${fhtml}
       <div class="f full"><label>In your library</label><div style="color:var(--muted);font-size:13px">Counted as owned automatically once it has a store (or a price, year, or “also on”).</div></div>
+      <div class="f full"><label>Visibility</label><label class="checkrow"><input type="checkbox" id="m-Hidden" ${g.Hidden==='Yes'?'checked':''}><span style="color:var(--muted);font-size:13px">Hide from the library &amp; series graph (still counted in all totals)</span></label></div>
       <div class="f full"><label>Avg score (auto · colour = tier)</label><div class="ro" id="m-avg">—</div></div>
     </div>
     <div class="modal-f">
@@ -622,6 +639,7 @@ function openEdit(id){
 function readModal(){
   const g={};
   for(const [k,,type] of FIELDS){const el=document.getElementById('m-'+k);let v=el.value;g[k]=(type==='num')?num(v):(typeof v==='string'?v.trim():v);}
+  const hc=document.getElementById('m-Hidden'); g.Hidden=hc&&hc.checked?'Yes':'';
   return g;
 }
 function liveAuto(){const g=readModal();const a=computeAvg(g),t=tierFromAvg(a);const el=document.getElementById('m-avg');el.textContent=a===''?'—':(a+(t==='top'?'  ·  top tier':t==='good'?'  ·  good':t==='ok'?'  ·  ok':'  ·  low'));el.style.color=t==='top'?'var(--q1)':t==='good'?'var(--q2)':t==='ok'?'var(--q3)':'var(--text)';}
@@ -661,7 +679,7 @@ function buildWorkbook(){
   });
   XLSX.utils.book_append_sheet(wb, gws, 'Games');
   if((MODEL.wishlist||[]).length){const wd=[['Released','Game','Critic','Steam','HLTB','HLTB Full','Notes','Bought?'],...MODEL.wishlist.map(w=>[bn(w.Year),bn(w.Game),bn(w.Critic),bn(w.Steam),bn(w.HLTB),bn(w.HLTBFull),bn(w.Note),w.Bought?'Yes':null])];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(wd),(MODEL.wishSheet||'Wishlists').slice(0,31));}
-  if((MODEL.ratings||[]).length){const rd=[['Game','Rating'],...MODEL.ratings.map(x=>[x.Game,bn(x.Rating)])];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rd),(MODEL.rateSheet||'Played Games').slice(0,31));}
+  if((MODEL.ratings||[]).length){const rd=[['Game','Rating','Year','Notes'],...MODEL.ratings.map(x=>[x.Game,bn(x.Rating),bn(x.Year),bn(x.Note)])];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rd),(MODEL.rateSheet||'Played Games').slice(0,31));}
   for(const [src,a] of Object.entries(MODEL.passthrough||{})){const nm=src.slice(0,31);if(!wb.SheetNames.includes(nm))XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(a), nm);}
   return wb;
 }
@@ -670,7 +688,7 @@ function download(fmt){
   try{
     const wb=buildWorkbook();
     if(fmt==='csv'){saveBlob(new Blob([XLSX.utils.sheet_to_csv(wb.Sheets['Games'])],{type:'text/csv'}),stamp()+'.csv');}
-    else{const out=XLSX.write(wb,{bookType:fmt,type:'array'});saveBlob(new Blob([out],{type:'application/octet-stream'}),stamp()+'.'+fmt);}
+    else{const out=XLSX.write(wb,{bookType:fmt,type:'array',compression:true});saveBlob(new Blob([out],{type:'application/octet-stream'}),stamp()+'.'+fmt);}
     DIRTY=0; updateUnsaved();
   }catch(err){alert('Download failed: '+err.message+'\nTry the .xlsx option.');}
 }
@@ -684,22 +702,29 @@ dlMenu.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{dlM
 function renderSeriesChart(rows){
   const el=document.getElementById('serieschart');
   if(!FILTER.series){el.classList.add('hide');el.innerHTML='';return;}
-  const pts=rows.filter(g=>g.Critic!==''||g.SteamDB!==''||g.MyRating!=='');
+  const pts=rows.filter(g=>g.Hidden!=='Yes' && (g.Critic!==''||g.SteamDB!==''||g.MyRating!==''));
   pts.sort((a,b)=>{const ay=a.ReleaseYear===''?9999:a.ReleaseYear,by=b.ReleaseYear===''?9999:b.ReleaseYear;return ay-by||cmp(a.Name,b.Name);});
   if(pts.length<2){el.classList.add('hide');el.innerHTML='';return;}
   el.classList.remove('hide');
-  el.innerHTML=`<p class="ttl">${esc(FILTER.series)} — scores across the series</p>
-    <div class="leg"><span class="c1">Critic</span><span class="c2">SteamDB</span><span class="c3">My rating ×10</span></div>`+svgChart(pts);
+  el.innerHTML=`<p class="ttl">${esc(FILTER.series)} — scores across the series (${pts.length})</p>
+    <div class="leg"><span class="c1">Critic</span><span class="c2">SteamDB</span><span class="c3">My rating ×10</span></div>
+    <div class="chartscroll">${svgChart(pts)}</div>
+    <p class="charthint">Each point is one game (oldest → newest). Hover or tap a label to see the full title.</p>`;
 }
 function svgChart(pts){
-  const n=pts.length, W=Math.max(340,n*72), H=200, padL=32,padR=14,padT=12,padB=52;
-  const ix=i=>padL+(n===1?0:i*(W-padL-padR)/(n-1));
+  const n=pts.length, step=70, padL=38,padR=26,padT=14,padB=46, H=210;
+  const W=padL+padR+(n-1)*step;
+  const ix=i=>padL+i*step;
   const yMin=40,yMax=100, iy=v=>padT+(1-(Math.max(yMin,Math.min(yMax,v))-yMin)/(yMax-yMin))*(H-padT-padB);
-  const grid=[40,55,70,85,100].map(v=>`<line x1="${padL}" y1="${iy(v)}" x2="${W-padR}" y2="${iy(v)}" stroke="var(--line)"/><text x="${padL-5}" y="${iy(v)+3}" text-anchor="end" font-size="9" fill="var(--faint)" font-family="IBM Plex Mono,monospace">${v}</text>`).join('');
-  const line=(key,color,mult)=>{let d='',started=false;const dots=[];pts.forEach((g,i)=>{let val=g[key];if(val==='')return;val*=(mult||1);const x=ix(i),y=iy(val);d+=(started?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)+' ';started=true;dots.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.2" fill="${color}"><title>${esc(g.Name)} — ${key}: ${g[key]}</title></circle>`);});return (d?`<path d="${d}" fill="none" stroke="${color}" stroke-width="2"/>`:'')+dots.join('');};
-  const showNames=n<=10;
-  const xlab=pts.map((g,i)=>`<text x="${ix(i)}" y="${H-padB+16}" text-anchor="middle" font-size="9" fill="var(--faint)" font-family="IBM Plex Mono,monospace">${g.ReleaseYear||''}</text>`+(showNames?`<text x="${ix(i)}" y="${H-padB+28}" text-anchor="middle" font-size="8" fill="var(--faint)">${esc((g.Name||'').slice(0,12))}</text>`:'')).join('');
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="series scores">${grid}${line('Critic','var(--mint)')}${line('SteamDB','var(--violet)')}${line('MyRating','var(--amber)',10)}${xlab}</svg>`;
+  const grid=[40,55,70,85,100].map(v=>`<line x1="${padL}" y1="${iy(v)}" x2="${W-padR}" y2="${iy(v)}" stroke="var(--line)"/><text x="${padL-6}" y="${iy(v)+3}" text-anchor="end" font-size="9" fill="var(--faint)" font-family="IBM Plex Mono,monospace">${v}</text>`).join('');
+  const line=(key,color,mult,lbl)=>{let d='',started=false;const dots=[];pts.forEach((g,i)=>{let val=g[key];if(val==='')return;val*=(mult||1);const x=ix(i),y=iy(val);d+=(started?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)+' ';started=true;dots.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.4" fill="${color}"><title>${esc(g.Name)} — ${lbl} ${g[key]}</title></circle>`);});return (d?`<path d="${d}" fill="none" stroke="${color}" stroke-width="2"/>`:'')+dots.join('');};
+  const xlab=pts.map((g,i)=>{const x=ix(i),nm=g.Name||'';const short=nm.length>12?esc(nm.slice(0,11))+'…':esc(nm);
+    return `<g class="xlab"><title>${esc(nm)}${g.ReleaseYear?' — '+g.ReleaseYear:''}</title>`
+      +`<rect x="${x-step/2}" y="${padT}" width="${step}" height="${H-padT}" fill="transparent"/>`
+      +`<text x="${x}" y="${H-padB+16}" text-anchor="middle" font-size="8.5" fill="var(--muted)" font-family="IBM Plex Mono,monospace">${short}</text>`
+      +`<text x="${x}" y="${H-padB+30}" text-anchor="middle" font-size="8.5" fill="var(--faint)" font-family="IBM Plex Mono,monospace">${g.ReleaseYear||''}</text></g>`;
+  }).join('');
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="series scores">${grid}${line('Critic','var(--mint)',1,'Critic')}${line('SteamDB','var(--violet)',1,'SteamDB')}${line('MyRating','var(--amber)',10,'My rating')}${xlab}</svg>`;
 }
 
 /* ============ wishlist + ratings (editable) ============ */
@@ -717,8 +742,11 @@ function parseRatingsAoa(a){
   if(!a||!a.length)return [];
   const head=a[0].map(x=>String(x==null?'':x).toLowerCase());
   const ri=head.findIndex(x=>x.includes('rating'));
+  const yi=head.findIndex(x=>/year|played/.test(x));
+  const ni=head.findIndex(x=>x.includes('note'));
   const out=[];
-  for(let r=1;r<a.length;r++){const row=a[r];const nm=row[0];if(nm==null||String(nm).trim()==='')continue;const low=String(nm).trim().toLowerCase();if(low==='older'||low==='newer'||low==='liked')continue;const rt=ri>=0?num(row[ri]):'';if(rt==='')continue;out.push({_id:UID++,Game:String(nm).trim(),Rating:rt});}
+  for(let r=1;r<a.length;r++){const row=a[r];const nm=row[0];if(nm==null||String(nm).trim()==='')continue;const low=String(nm).trim().toLowerCase();if(low==='older'||low==='newer'||low==='liked')continue;const rt=ri>=0?num(row[ri]):'';if(rt==='')continue;
+    out.push({_id:UID++,Game:String(nm).trim(),Rating:rt,Year:(yi>=0&&row[yi]!=null)?String(row[yi]).trim():'',Note:(ni>=0&&row[ni]!=null)?String(row[ni]).trim():''});}
   out.sort((a,b)=>b.Rating-a.Rating);
   return out;
 }
@@ -742,16 +770,16 @@ function syncRatingsToGames(){
 }
 function reconcileRatings(){
   const map=new Map();
-  for(const r of (MODEL.ratings||[])){const k=baseKey(r.Game);if(!map.has(k))map.set(k,{Game:baseDisplay(r.Game),Rating:r.Rating});}
-  for(const g of MODEL.games){if(g.MyRating!==''){const k=baseKey(g.Name);if(!map.has(k))map.set(k,{Game:baseDisplay(g.Name),Rating:g.MyRating});}}
-  MODEL.ratings=[...map.entries()].map(([k,v])=>({_id:UID++,key:k,Game:v.Game,Rating:v.Rating})).sort((a,b)=>b.Rating-a.Rating);
+  for(const r of (MODEL.ratings||[])){const k=baseKey(r.Game);if(!map.has(k))map.set(k,{Game:baseDisplay(r.Game),Rating:r.Rating,Year:r.Year||'',Note:r.Note||''});}
+  for(const g of MODEL.games){if(g.MyRating!==''){const k=baseKey(g.Name);if(!map.has(k))map.set(k,{Game:baseDisplay(g.Name),Rating:g.MyRating,Year:'',Note:''});}}
+  MODEL.ratings=[...map.entries()].map(([k,v])=>({_id:UID++,key:k,Game:v.Game,Rating:v.Rating,Year:v.Year,Note:v.Note})).sort((a,b)=>b.Rating-a.Rating);
   syncRatingsToGames();
 }
 function setRating(name,rating){
   const k=baseKey(name);let e=MODEL.ratings.find(r=>r.key===k);
   if(rating===''||rating==null){if(e)MODEL.ratings=MODEL.ratings.filter(r=>r!==e);}
   else if(e){e.Rating=rating;}
-  else MODEL.ratings.push({_id:UID++,key:k,Game:baseDisplay(name),Rating:rating});
+  else MODEL.ratings.push({_id:UID++,key:k,Game:baseDisplay(name),Rating:rating,Year:'',Note:''});
   MODEL.ratings.sort((a,b)=>b.Rating-a.Rating); syncRatingsToGames();
 }
 function emptyRow(n){return `<tr><td colspan="${n}" style="text-align:center;color:var(--faint);padding:26px">Nothing here yet — tap Add</td></tr>`;}
@@ -769,11 +797,11 @@ function renderWishlist(){
 function renderRatings(){
   const q=(document.getElementById('rq').value||'').trim().toLowerCase();
   const list=MODEL.ratings||[];
-  const rows=list.filter(x=>!q||x.Game.toLowerCase().includes(q));
+  const rows=list.filter(x=>!q||x.Game.toLowerCase().includes(q)||(x.Note||'').toLowerCase().includes(q));
   document.getElementById('ct-rate').textContent=list.length;
   document.getElementById('rate-count').textContent=rows.length+' shown';
-  document.getElementById('rthead').innerHTML=['Game','My rating',''].map((h,i)=>`<th class="${i===1?'r':''} ${i===0?'sticky-name':''}">${h}</th>`).join('');
-  document.getElementById('rbody').innerHTML=rows.map(x=>{const pct=Math.max(4,Math.round((x.Rating||0)/10*100));const cl=x.Rating>=8?'av-top':x.Rating>=6.5?'av-good':'av-ok';return `<tr data-rid="${x._id}"><td class="name sticky-name">${esc(x.Game)}<span class="edit">edit</span></td><td class="num"><span class="${cl}">${x.Rating}</span><span style="color:var(--faint)">/10</span></td><td><span style="display:inline-block;width:140px;height:8px;border-radius:5px;background:var(--raised);overflow:hidden;vertical-align:middle"><i style="display:block;height:100%;width:${pct}%;background:linear-gradient(90deg,#5f53b8,var(--violet))"></i></span></td></tr>`;}).join('')||emptyRow(3);
+  document.getElementById('rthead').innerHTML=['Game','My rating','Year','Notes'].map((h,i)=>`<th class="${i===1?'r':''} ${i===0?'sticky-name':''}">${h}</th>`).join('');
+  document.getElementById('rbody').innerHTML=rows.map(x=>{const cl=x.Rating>=8?'av-top':x.Rating>=6.5?'av-good':'av-ok';const yr=x.Year?esc(x.Year):'<span style="color:var(--faint)">·</span>';return `<tr data-rid="${x._id}"><td class="name sticky-name">${esc(x.Game)}<span class="edit">edit</span></td><td class="num"><span class="${cl}">${x.Rating}</span><span style="color:var(--faint)">/10</span></td><td class="num">${yr}</td><td class="series">${esc(x.Note||'')}</td></tr>`;}).join('')||emptyRow(4);
 }
 /* generic mini editor for a row object */
 function openMini(title,fields,obj,onSave,onDelete){
@@ -794,9 +822,9 @@ function openMini(title,fields,obj,onSave,onDelete){
   setTimeout(()=>document.getElementById('mm-'+fields[0][0]).focus(),30);
 }
 const WISH_FIELDS=[['Game','Game','wide'],['Year','Released (year)','num'],['Critic','Critic','num'],['Steam','Steam','num'],['HLTB','HLTB hours','num'],['HLTBFull','HLTB full','num'],['Note','Notes','wide']];
-const RATE_FIELDS=[['Game','Game','wide'],['Rating','My rating (0–10)','num']];
+const RATE_FIELDS=[['Game','Game','wide'],['Rating','My rating (0–10)','num'],['Year','Year played',''],['Note','Notes','wide']];
 function editWish(id){const w=MODEL.wishlist.find(x=>x._id===id);openMini('Edit wishlist item',WISH_FIELDS,w,r=>{Object.assign(w,r);renderWishlist();},()=>{MODEL.wishlist=MODEL.wishlist.filter(x=>x._id!==id);renderWishlist();});}
-function editRate(id){const x=MODEL.ratings.find(v=>v._id===id);openMini('Edit rating',RATE_FIELDS,x,r=>{x.Game=baseDisplay(r.Game);x.Rating=r.Rating;x.key=baseKey(r.Game);MODEL.ratings.sort((a,b)=>b.Rating-a.Rating);syncRatingsToGames();renderRatings();renderTable();},()=>{MODEL.ratings=MODEL.ratings.filter(v=>v._id!==id);syncRatingsToGames();renderRatings();renderTable();});}
+function editRate(id){const x=MODEL.ratings.find(v=>v._id===id);openMini('Edit rating',RATE_FIELDS,x,r=>{x.Game=baseDisplay(r.Game);x.Rating=r.Rating;x.Year=r.Year;x.Note=r.Note;x.key=baseKey(r.Game);MODEL.ratings.sort((a,b)=>b.Rating-a.Rating);syncRatingsToGames();renderRatings();renderTable();},()=>{MODEL.ratings=MODEL.ratings.filter(v=>v._id!==id);syncRatingsToGames();renderRatings();renderTable();});}
 document.getElementById('wbody').addEventListener('click',e=>{
   const cb=e.target.closest('.wbk');
   if(cb){const tr=e.target.closest('[data-wid]');const w=MODEL.wishlist.find(x=>x._id===+tr.dataset.wid);if(w){w.Bought=cb.checked;DIRTY++;updateUnsaved();renderWishlist();}return;}
@@ -804,7 +832,7 @@ document.getElementById('wbody').addEventListener('click',e=>{
 });
 document.getElementById('rbody').addEventListener('click',e=>{const tr=e.target.closest('[data-rid]');if(tr)editRate(+tr.dataset.rid);});
 document.getElementById('wadd').addEventListener('click',()=>openMini('Add wishlist item',WISH_FIELDS,null,r=>{r._id=UID++;MODEL.wishlist.push(r);renderWishlist();}));
-document.getElementById('radd').addEventListener('click',()=>openMini('Add rating',RATE_FIELDS,null,r=>{MODEL.ratings.push({_id:UID++,key:baseKey(r.Game),Game:baseDisplay(r.Game),Rating:r.Rating});MODEL.ratings.sort((a,b)=>b.Rating-a.Rating);syncRatingsToGames();renderRatings();renderTable();}));
+document.getElementById('radd').addEventListener('click',()=>openMini('Add rating',RATE_FIELDS,null,r=>{MODEL.ratings.push({_id:UID++,key:baseKey(r.Game),Game:baseDisplay(r.Game),Rating:r.Rating,Year:r.Year,Note:r.Note});MODEL.ratings.sort((a,b)=>b.Rating-a.Rating);syncRatingsToGames();renderRatings();renderTable();}));
 document.getElementById('wq').addEventListener('input',renderWishlist);
 document.getElementById('rq').addEventListener('input',renderRatings);
 document.getElementById('tabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(!b)return;const t=b.dataset.tab;document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('on',x===b));['library','wishlist','ratings'].forEach(p=>document.getElementById('tab-'+p).classList.toggle('hide',p!==t));});
